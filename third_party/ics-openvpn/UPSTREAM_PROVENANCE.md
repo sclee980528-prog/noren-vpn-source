@@ -44,6 +44,14 @@ source set. Compiling it for `armeabi-v7a` produced integer-truncation and
 out-of-bounds-copy warnings even though the optimized method was not referenced
 on that ABI.
 
+The Android ARM64 build defines `OPENSSL_ANDROID_DISABLE_SVE`. An Android 16 TV
+ARM64 emulator advertised SVE2 through `getauxval()` while its emulated CPU
+raised `SIGILL` in OpenSSL's `_armv8_sve_get_vl_bytes` instruction during
+library initialization. The local guard prevents OpenSSL from selecting its
+SVE/SVE2 paths on Android. Baseline ARM64, NEON, AES, PMULL, SHA, and RNG feature
+detection remain enabled. This favors reliable startup across Android devices
+and emulators over optional SVE acceleration.
+
 ## Recovery copy
 
 The pre-update OpenSSL 4.0.0 vendor tree is archived at:
@@ -67,6 +75,11 @@ Result: `BUILD SUCCESSFUL`, with Lint completing successfully. Both packaged
 `libopenvpn.so` binaries report `OpenSSL 4.0.1 9 Jun 2026`. The 32-bit library
 contains no `EC_GFp_sm2p256_method` or `ecp_sm2p256_*` optimized symbols; the
 ARM64 library retains them.
+
+The signed release APK was also installed on a headless Android TV 16 ARM64
+emulator. After disabling the Android SVE/SVE2 dispatch described above, repeated
+cold launches must complete without `SIGILL` before the release artifacts are
+accepted.
 
 Before a future release, compare this vendor tree with the current ics-openvpn,
 OpenVPN, and OpenSSL security releases and repeat the two-ABI clean build and

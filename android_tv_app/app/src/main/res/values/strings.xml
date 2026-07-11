@@ -1,4 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">oneclick free vpn</string>
+    <string name="app_name">Noren VPN</string>
+    <string name="status_disconnected">● Disconnected</string>
+    <string name="status_connected">● Connected</string>
+    <string name="status_connected_detail">● Connected · %1$s</string>
+    <string name="status_connecting">● Connecting…</string>
+    <string name="action_start_vpn">Start VPN</string>
+    <string name="action_disconnect">Disconnect</string>
+    <string name="action_connecting">Connecting…</string>
+    <string name="action_connecting_short">Connecting</string>
+    <string name="action_switch_server">Switch to selected server</string>
+    <string name="action_connect_selected">Connect selected server</string>
+    <string name="action_choose_server">Choose server manually</string>
+    <string name="action_unlock_server">Unlock server selection</string>
+    <string name="action_close_details">Close details</string>
+    <string name="action_privacy">Privacy</string>
+    <string name="action_speed">Speed</string>
+    <string name="action_ping">Ping</string>
+    <string name="action_score">Score</string>
+    <string name="action_quality_off">Quality filter OFF</string>
+    <string name="action_quality_on">Quality filter ON</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_check_ip">Check IP</string>
+    <string name="section_country">Country</string>
+    <string name="selected_server_none">Selected server: none</string>
+    <string name="selected_server_detail">Selected server\nHost name: %1$s\nIP: %2$s\nPing: %3$s ms\nSpeed: %4$s Mbps\nSessions: %5$d\nUptime: %6$s\nFilter: %7$s\nAuto quality: %8$s</string>
+    <string name="detail_with_current">%1$s%2$s</string>
+    <string name="server_load_failed_detail">Server list load failed\n%1$s</string>
+    <string name="selected_country">Selected country</string>
+    <string name="connected_default">connected</string>
+    <string name="current_vpn">Current VPN: %1$s\n\n</string>
+    <string name="footer_status">Build %1$s · Servers updated %2$s</string>
+
+    <string name="pro_title">Noren VPN Pro</string>
+    <string name="pro_price_pending">Google Play will show the final local price before purchase.</string>
+    <string name="pro_price_one_time">One-time purchase: %1$s</string>
+    <string name="pro_message">Automatic mode: one-tap VPN connection by country.\n\nPro adds exact server selection, sorting by speed, ping, or score, quality filtering, manual switching, and OVPN profile export.\n\n%1$s</string>
+    <string name="pro_buy">Buy Pro</string>
+    <string name="pro_restore">Restore purchase</string>
+    <string name="not_now">Not now</string>
+    <string name="purchase_unavailable_title">Purchase unavailable</string>
+    <string name="purchases_unavailable_title">Purchases unavailable</string>
+    <string name="restore_unavailable_title">Restore unavailable</string>
+    <string name="billing_unavailable_message">Purchases are not available right now.\n\nIf this app was installed from Google Play, try again in a moment or use Restore purchase.</string>
+    <string name="restore_check_failed">Google Play could not check your purchase right now. Please try again in a moment.</string>
+    <string name="purchase_pending_title">Purchase pending</string>
+    <string name="purchase_pending_message">Google Play reports that the Pro purchase is still pending. Server selection will unlock after the purchase completes.</string>
+    <string name="pro_restored_title">Pro restored</string>
+    <string name="pro_restored_message">Server selection is unlocked on this device.</string>
+    <string name="no_purchase_title">No purchase found</string>
+    <string name="no_purchase_message">No Pro purchase was found for this Google Play account.</string>
+    <string name="product_inactive_message">The Pro product is not active in Google Play yet. Please try again after the store listing is fully set up.</string>
+    <string name="billing_connecting_message">Google Play is connecting. Please try Restore again in a moment.</string>
+
+    <string name="vpn_disclosure_title">How your VPN data is handled</string>
+    <string name="vpn_disclosure_message">To provide the VPN, Noren VPN uses Android VpnService and sends this device\'s network traffic through a public VPN Gate volunteer server until you disconnect.\n\nVPN Gate states that its connection logs include connection times, your source IP address and hostname, the selected VPN server, protocol and client details, traffic totals and errors, and destination HTTP/HTTPS hostnames, IP addresses, and port numbers. Its central logs are kept for at least three months. Each volunteer server also keeps TCP/IP packet headers for at least two weeks. Logs may be disclosed when legally authorized.\n\nWe do not operate those servers or receive their logs. We use the traffic only to provide the VPN; VPN Gate and the volunteer operator handle the logged data. Choose Agree and continue only if you consent.</string>
+    <string name="agree_continue">Agree and continue</string>
+    <string name="logging_policy">Logging policy</string>
+
+    <string name="privacy_title">Privacy and VPN logging</string>
+    <string name="privacy_message">Noren VPN uses Android VpnService to route this device\'s network traffic through an encrypted OpenVPN tunnel to a public VPN Gate volunteer server. We do not operate those servers or receive their logs.\n\nVPN Gate states that its central connection logs include connection times, source IP address and hostname, selected server, protocol and client details, traffic totals and errors, and destination HTTP/HTTPS hostnames, IP addresses, and ports. Those logs are kept for at least three months. Volunteer servers keep TCP/IP packet headers for at least two weeks. Legally authorized disclosures may occur.\n\nThe app has no account, ads, or analytics. It stores settings, server cache, purchase unlock state, and optional exported OVPN profiles locally. Public IP services receive normal request metadata when the app checks the connected IP. Google Play handles optional Pro purchases.\n\nThe tunnel protects traffic only to the VPN endpoint. Security after that endpoint depends on each destination service, and anonymity, availability, and access are not guaranteed.</string>
+
+    <string name="server_actions_title">Server actions</string>
+    <string name="server_actions_message">Host name: %1$s\nIP: %2$s\nPing: %3$s ms\nSpeed: %4$s Mbps\nUptime: %5$s\nAuto quality: %6$s\n\nPress Connect to request Android VPN permission and start the OpenVPN connection inside this app.</string>
+    <string name="action_connect">Connect</string>
+    <string name="action_save_profile">Save profile</string>
+    <string name="action_close">Close</string>
+
+    <string name="profile_saved_title">Profile saved</string>
+    <string name="profile_saved_message">File created\n\nFile: %1$s\nLocation: %2$s\n\nPress Open in OpenVPN to go to the import screen. If nothing happens, open Import Profile → File → Downloads/NorenVPN in OpenVPN for Android.</string>
+    <string name="profile_location_app">Temporary app storage/%1$s</string>
+    <string name="open_in_openvpn">Open in OpenVPN</string>
+    <string name="open_openvpn_app">Open OpenVPN app</string>
+    <string name="external_openvpn_title">External OpenVPN app</string>
+    <string name="external_openvpn_message">This backup path is used only when the built-in connection fails. Normally the app requests Android VPN permission and starts its own OpenVPN service.</string>
+    <string name="open_play_store">Open Play Store</string>
+
+    <string name="table_rank">Rank</string>
+    <string name="table_host">Host name</string>
+    <string name="table_ip">IP</string>
+    <string name="table_ping">Ping</string>
+    <string name="table_speed">Speed Mbps</string>
+    <string name="table_sessions">Sessions</string>
+    <string name="table_uptime">Uptime</string>
+    <string name="table_filter">Filter</string>
+    <string name="filter_ok">OK</string>
+    <string name="reason_no_ping">No ping</string>
+    <string name="reason_no_speed">No speed</string>
+    <string name="reason_crowded">Crowded</string>
+    <string name="reason_ping_high">Ping %1$sms too high</string>
+    <string name="reason_speed_low">Below %1$sMbps</string>
+    <plurals name="reason_sessions_high">
+        <item quantity="one">Over %1$d session</item>
+        <item quantity="other">Over %1$d sessions</item>
+    </plurals>
+    <string name="reason_uptime_short">Uptime under %1$s</string>
+    <string name="reason_uptime_long">Uptime over %1$s</string>
+    <string name="recommended">Recommended</string>
+    <string name="no_recommended_server">No recommended server</string>
+    <string name="try_another_country">Try another country or refresh the server list.</string>
+    <string name="waiting">Waiting</string>
+    <string name="recommend_title">%1$s / %2$s</string>
+    <string name="recommend_meta">Ping %1$sms / %2$sMbps / Sessions %3$d / Uptime %4$s</string>
+    <string name="server_required_title">Server required</string>
+    <string name="server_required_message">Pick a server from the list, then try again.</string>
+    <string name="profile_save_failed_title">Profile save failed</string>
+    <string name="loading_servers_title">Loading servers</string>
+    <string name="loading_servers_message">The server list is still loading. Please try Start VPN again in a moment.</string>
+    <string name="no_server_title">No server available</string>
+    <string name="no_server_message">No %1$s servers are available right now.\n\nChoose another country or refresh the server list, then try again.</string>
+    <string name="unable_open_link_title">Unable to open link</string>
+    <string name="unknown_error">Unknown error.</string>
 </resources>

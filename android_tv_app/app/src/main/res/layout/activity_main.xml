@@ -3,7 +3,6 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/tv_bg"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:orientation="vertical"
@@ -41,7 +40,7 @@
             android:gravity="end|center_vertical"
             android:includeFontPadding="false"
             android:singleLine="true"
-            android:text="● Disconnected"
+            android:text="@string/status_disconnected"
             android:textColor="@color/tv_muted"
             android:textSize="28sp"
             android:textStyle="bold" />
@@ -58,8 +57,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:clipChildren="false"
-        android:clipToPadding="false"
+        android:clipChildren="true"
+        android:clipToPadding="true"
         android:descendantFocusability="afterDescendants"
         android:fillViewport="true"
         android:focusable="false"
@@ -96,7 +95,7 @@
                     android:layout_height="80dp"
                     android:layout_weight="3"
                     android:nextFocusDown="@id/countryScroll"
-                    android:text="Start VPN" />
+                    android:text="@string/action_start_vpn" />
 
                 <Space
                     android:layout_width="0dp"
@@ -107,7 +106,7 @@
             <TextView
                 style="@style/TvSectionLabel"
                 android:layout_marginTop="26dp"
-                android:text="Country" />
+                android:text="@string/section_country" />
 
             <HorizontalScrollView
                 android:id="@+id/countryScroll"
@@ -149,7 +148,7 @@
                     android:layout_width="0dp"
                     android:layout_height="64dp"
                     android:layout_weight="1.35"
-                    android:text="Choose server manually" />
+                    android:text="@string/action_choose_server" />
 
                 <Button
                     android:id="@+id/disconnectButton"
@@ -158,7 +157,7 @@
                     android:layout_height="64dp"
                     android:layout_marginEnd="0dp"
                     android:layout_weight="1"
-                    android:text="Disconnect"
+                    android:text="@string/action_disconnect"
                     android:visibility="gone" />
 
                 <Button
@@ -168,7 +167,7 @@
                     android:layout_height="64dp"
                     android:layout_marginEnd="0dp"
                     android:layout_weight="0.65"
-                    android:text="Privacy" />
+                    android:text="@string/action_privacy" />
             </LinearLayout>
 
             <LinearLayout
@@ -194,49 +193,45 @@
                         <Button
                             android:id="@+id/speedButton"
                             style="@style/TvCardButton"
-                            android:text="Speed" />
+                            android:text="@string/action_speed" />
 
                         <Button
                             android:id="@+id/pingButton"
                             style="@style/TvCardButton"
-                            android:text="Ping" />
+                            android:text="@string/action_ping" />
 
                         <Button
                             android:id="@+id/scoreButton"
                             style="@style/TvCardButton"
-                            android:text="Score" />
+                            android:text="@string/action_score" />
 
                         <Button
                             android:id="@+id/guideButton"
                             style="@style/TvCardButton"
-                            android:text="Quality filter OFF" />
+                            android:text="@string/action_quality_off" />
 
                         <Button
                             android:id="@+id/refreshButton"
                             style="@style/TvCardButton"
-                            android:text="Refresh" />
+                            android:text="@string/action_refresh" />
 
                         <Button
                             android:id="@+id/ipButton"
                             style="@style/TvCardButton"
-                            android:text="Check IP" />
+                            android:text="@string/action_check_ip" />
                     </LinearLayout>
                 </HorizontalScrollView>
 
                 <HorizontalScrollView
                     android:layout_width="match_parent"
-                    android:layout_height="320dp">
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none">
 
-                    <ScrollView
+                    <LinearLayout
+                        android:id="@+id/table"
                         android:layout_width="wrap_content"
-                        android:layout_height="match_parent">
-
-                        <LinearLayout
-                            android:id="@+id/table"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical" />
-                    </ScrollView>
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
                 </HorizontalScrollView>
 
                 <Button
@@ -245,13 +240,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="12dp"
-                    android:text="Connect selected server" />
+                    android:text="@string/action_connect_selected" />
 
                 <TextView
                     android:id="@+id/detail"
                     style="@style/TvInfoPanel"
                     android:layout_marginTop="12dp"
-                    android:text="Selected server: none" />
+                    android:text="@string/selected_server_none" />
 
                 <TextView
                     android:id="@+id/log"

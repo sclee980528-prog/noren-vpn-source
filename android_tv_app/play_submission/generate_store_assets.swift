@@ -13,6 +13,8 @@ func roundedRect(_ rect: CGRect, radius: CGFloat, fill: NSColor) {
 }
 
 func drawText(_ text: String, rect: CGRect, size: CGFloat, weight: NSFont.Weight, color textColor: NSColor) {
+    NSGraphicsContext.saveGraphicsState()
+    defer { NSGraphicsContext.restoreGraphicsState() }
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .left
     let attrs: [NSAttributedString.Key: Any] = [
@@ -31,14 +33,19 @@ func savePNG(_ image: NSImage, to path: String) throws {
     else {
         throw NSError(domain: "asset", code: 1)
     }
-    try png.write(to: URL(fileURLWithPath: path))
+    let url = URL(fileURLWithPath: path)
+    try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try png.write(to: url)
 }
 
 func drawPowerMark(center: CGPoint, radius: CGFloat, lineWidth: CGFloat) {
-    color(0x14B8A6).setFill()
+    color(0x0F8B8D).setFill()
     NSBezierPath(ovalIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)).fill()
-    color(0x99F6E4, 0.30).setFill()
-    NSBezierPath(ovalIn: CGRect(x: center.x - radius * 0.87, y: center.y - radius * 0.02, width: radius * 1.74, height: radius * 1.08)).fill()
+    color(0x64D8CB).setFill()
+    NSBezierPath(ovalIn: CGRect(x: center.x - radius * 0.86, y: center.y + radius * 0.15, width: radius * 1.72, height: radius * 0.54)).fill()
 
     let stem = NSBezierPath()
     stem.lineWidth = lineWidth
@@ -56,50 +63,103 @@ func drawPowerMark(center: CGPoint, radius: CGFloat, lineWidth: CGFloat) {
     arc.stroke()
 }
 
-func drawFeatureGraphic() throws {
-    let output = "/Users/sangchan/Desktop/oneclick_store_assets/feature_graphic_1024x500.png"
+func drawRoute(from start: CGPoint, to end: CGPoint, lineWidth: CGFloat) {
+    let route = NSBezierPath()
+    route.lineWidth = lineWidth
+    route.lineCapStyle = .round
+    color(0xF4B942).setStroke()
+    route.move(to: start)
+    route.line(to: CGPoint(x: (start.x + end.x) * 0.52, y: start.y))
+    route.line(to: CGPoint(x: (start.x + end.x) * 0.52, y: end.y))
+    route.line(to: end)
+    route.stroke()
+
+    color(0xF4B942).setFill()
+    let dot = lineWidth * 2.5
+    NSBezierPath(ovalIn: CGRect(x: end.x - dot / 2, y: end.y - dot / 2, width: dot, height: dot)).fill()
+}
+
+func drawFeatureGraphic(locale: String, headline: String, detail: String) throws {
+    let output = "play_submission/store_assets/\(locale)/feature_graphic_1024x500.png"
     let image = NSImage(size: NSSize(width: 1024, height: 500))
     image.lockFocus()
 
-    color(0x0B1220).setFill()
+    color(0x111315).setFill()
     CGRect(x: 0, y: 0, width: 1024, height: 500).fill()
+    color(0x202526).setFill()
+    CGRect(x: 0, y: 0, width: 326, height: 500).fill()
+    color(0x0F8B8D).setFill()
+    CGRect(x: 0, y: 0, width: 12, height: 500).fill()
 
-    roundedRect(CGRect(x: 54, y: 58, width: 916, height: 384), radius: 32, fill: color(0x111827))
-    roundedRect(CGRect(x: 54, y: 58, width: 916, height: 140), radius: 32, fill: color(0x020617, 0.22))
-    drawPowerMark(center: CGPoint(x: 206, y: 250), radius: 108, lineWidth: 22)
+    drawPowerMark(center: CGPoint(x: 166, y: 250), radius: 106, lineWidth: 21)
+    drawRoute(from: CGPoint(x: 274, y: 250), to: CGPoint(x: 366, y: 214), lineWidth: 7)
 
-    drawText("oneclick free vpn", rect: CGRect(x: 360, y: 268, width: 540, height: 70), size: 54, weight: .bold, color: color(0xF8FAFC))
-    drawText("Free VPN for Android TV, phone and tablet", rect: CGRect(x: 364, y: 222, width: 610, height: 40), size: 25, weight: .semibold, color: color(0x99F6E4))
-    drawText("One-tap country connection", rect: CGRect(x: 364, y: 176, width: 420, height: 34), size: 24, weight: .medium, color: color(0xCBD5E1))
+    drawText("Noren VPN", rect: CGRect(x: 384, y: 270, width: 570, height: 72), size: 56, weight: .bold, color: color(0xF5F7F4))
+    drawText(headline, rect: CGRect(x: 388, y: 218, width: 560, height: 42), size: 27, weight: .semibold, color: color(0x64D8CB))
+    drawText(detail, rect: CGRect(x: 388, y: 174, width: 560, height: 38), size: 22, weight: .medium, color: color(0xC3C9C5))
 
-    roundedRect(CGRect(x: 364, y: 130, width: 236, height: 14), radius: 7, fill: color(0x14B8A6))
-    roundedRect(CGRect(x: 620, y: 130, width: 164, height: 14), radius: 7, fill: color(0x334155))
+    roundedRect(CGRect(x: 388, y: 128, width: 172, height: 12), radius: 6, fill: color(0x0F8B8D))
+    roundedRect(CGRect(x: 574, y: 128, width: 92, height: 12), radius: 6, fill: color(0xF4B942))
+    roundedRect(CGRect(x: 680, y: 128, width: 214, height: 12), radius: 6, fill: color(0x3A4140))
 
     image.unlockFocus()
     try savePNG(image, to: output)
 }
 
-func drawTvBanner() throws {
-    let output = "/Users/sangchan/Desktop/oneclick_store_assets/tv_banner_1280x720.png"
+func drawTvBanner(locale: String, headline: String) throws {
+    let output = "play_submission/store_assets/\(locale)/tv_banner_1280x720.png"
     let image = NSImage(size: NSSize(width: 1280, height: 720))
     image.lockFocus()
 
-    color(0x0B1220).setFill()
+    color(0x111315).setFill()
     CGRect(x: 0, y: 0, width: 1280, height: 720).fill()
-    roundedRect(CGRect(x: 84, y: 84, width: 1112, height: 552), radius: 42, fill: color(0x111827))
-    roundedRect(CGRect(x: 84, y: 84, width: 1112, height: 178), radius: 42, fill: color(0x020617, 0.24))
-    drawPowerMark(center: CGPoint(x: 278, y: 360), radius: 126, lineWidth: 26)
+    color(0x202526).setFill()
+    CGRect(x: 0, y: 0, width: 420, height: 720).fill()
+    color(0x0F8B8D).setFill()
+    CGRect(x: 0, y: 0, width: 16, height: 720).fill()
+    drawPowerMark(center: CGPoint(x: 216, y: 360), radius: 132, lineWidth: 26)
+    drawRoute(from: CGPoint(x: 350, y: 360), to: CGPoint(x: 500, y: 300), lineWidth: 9)
 
-    drawText("oneclick free vpn", rect: CGRect(x: 472, y: 390, width: 640, height: 80), size: 62, weight: .bold, color: color(0xF8FAFC))
-    drawText("Free VPN for TV, phone and tablet", rect: CGRect(x: 478, y: 334, width: 620, height: 44), size: 30, weight: .semibold, color: color(0x99F6E4))
-    drawText("One-tap country connection", rect: CGRect(x: 478, y: 284, width: 470, height: 40), size: 29, weight: .medium, color: color(0xCBD5E1))
+    drawText("Noren VPN", rect: CGRect(x: 532, y: 374, width: 650, height: 84), size: 66, weight: .bold, color: color(0xF5F7F4))
+    drawText(headline, rect: CGRect(x: 538, y: 316, width: 650, height: 48), size: 31, weight: .semibold, color: color(0x64D8CB))
+    drawText("Android TV · Google TV · Phone · Tablet", rect: CGRect(x: 538, y: 262, width: 650, height: 42), size: 26, weight: .medium, color: color(0xC3C9C5))
 
-    roundedRect(CGRect(x: 478, y: 222, width: 276, height: 16), radius: 8, fill: color(0x14B8A6))
-    roundedRect(CGRect(x: 784, y: 222, width: 188, height: 16), radius: 8, fill: color(0x334155))
+    roundedRect(CGRect(x: 538, y: 206, width: 228, height: 14), radius: 7, fill: color(0x0F8B8D))
+    roundedRect(CGRect(x: 786, y: 206, width: 110, height: 14), radius: 7, fill: color(0xF4B942))
+    roundedRect(CGRect(x: 916, y: 206, width: 210, height: 14), radius: 7, fill: color(0x3A4140))
 
     image.unlockFocus()
     try savePNG(image, to: output)
 }
 
-try drawFeatureGraphic()
-try drawTvBanner()
+func drawAppBanner() throws {
+    let image = NSImage(size: NSSize(width: 320, height: 180))
+    image.lockFocus()
+
+    color(0x111315).setFill()
+    CGRect(x: 0, y: 0, width: 320, height: 180).fill()
+    color(0x0F8B8D).setFill()
+    CGRect(x: 0, y: 0, width: 6, height: 180).fill()
+    drawPowerMark(center: CGPoint(x: 74, y: 90), radius: 48, lineWidth: 10)
+    drawRoute(from: CGPoint(x: 123, y: 90), to: CGPoint(x: 146, y: 74), lineWidth: 3)
+    drawText("Noren", rect: CGRect(x: 158, y: 94, width: 148, height: 32), size: 25, weight: .bold, color: color(0xF5F7F4))
+    drawText("VPN", rect: CGRect(x: 158, y: 66, width: 88, height: 28), size: 22, weight: .semibold, color: color(0x64D8CB))
+    roundedRect(CGRect(x: 158, y: 47, width: 62, height: 5), radius: 2.5, fill: color(0x0F8B8D))
+    roundedRect(CGRect(x: 228, y: 47, width: 30, height: 5), radius: 2.5, fill: color(0xF4B942))
+
+    image.unlockFocus()
+    let outputs = [
+        "app/src/main/res/drawable-xhdpi/app_banner.png",
+        "app/src/tv/res/drawable/app_banner_tv.png",
+        "app/src/tv/res/drawable-xhdpi/app_banner_tv.png"
+    ]
+    for output in outputs {
+        try savePNG(image, to: output)
+    }
+}
+
+try drawFeatureGraphic(locale: "en-US", headline: "One tap. Clear controls.", detail: "Public volunteer VPN connections")
+try drawFeatureGraphic(locale: "ja-JP", headline: "ワンタップ。迷わない操作。", detail: "公開ボランティアVPNへ接続")
+try drawTvBanner(locale: "en-US", headline: "One-tap public VPN connection")
+try drawTvBanner(locale: "ja-JP", headline: "公開VPNへワンタップ接続")
+try drawAppBanner()

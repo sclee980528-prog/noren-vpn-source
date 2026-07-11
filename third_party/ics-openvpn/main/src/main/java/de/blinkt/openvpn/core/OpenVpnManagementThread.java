@@ -16,14 +16,13 @@ import androidx.annotation.NonNull;
 
 import android.system.Os;
 import android.util.Log;
+import de.blinkt.openvpn.BuildConfig;
 import de.blinkt.openvpn.R;
 import de.blinkt.openvpn.VpnProfile;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.*;
@@ -216,7 +215,8 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
                 pendingInput = processInput(pendingInput);
             }
         } catch (IOException e) {
-            if (!e.getMessage().equals("socket closed") && !e.getMessage().equals("Connection reset by peer"))
+            String message = e.getMessage();
+            if (!"socket closed".equals(message) && !"Connection reset by peer".equals(message))
                 VpnStatus.logException(e);
         }
         synchronized (active) {
@@ -224,27 +224,21 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
         }
     }
 
-    //! Hack O Rama 2000!
     private void protectFileDescriptor(FileDescriptor fd) {
-        try {
-            Method getInt = FileDescriptor.class.getDeclaredMethod("getInt$");
-            int fdint = (Integer) getInt.invoke(fd);
-
-            // You can even get more evil by parsing toString() and extract the int from that :)
-
-            boolean result = mOpenVPNService.protect(fdint);
-            if (!result)
-                VpnStatus.logWarning("Could not protect VPN socket");
-
-            fdClose(fd);
-
+        if (fd == null) {
+            VpnStatus.logWarning("OpenVPN did not provide a socket file descriptor");
             return;
-        } catch ( NoSuchMethodException | IllegalArgumentException | InvocationTargetException | IllegalAccessException | NullPointerException e) {
-            VpnStatus.logException("Failed to retrieve fd from socket (" + fd + ")", e);
         }
 
-        Log.d("Openvpn", "Failed to retrieve fd from socket: " + fd);
-
+        try (ParcelFileDescriptor duplicateFd = ParcelFileDescriptor.dup(fd)) {
+            boolean result = mOpenVPNService.protect(duplicateFd.getFd());
+            if (!result)
+                VpnStatus.logWarning("Could not protect VPN socket");
+        } catch (IOException | IllegalArgumentException e) {
+            VpnStatus.logException("Failed to protect VPN socket (" + fd + ")", e);
+        } finally {
+            fdClose(fd);
+        }
     }
 
     private void fdClose(FileDescriptor fd) {
@@ -312,7 +306,8 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
                     break;
                 default:
                     VpnStatus.logWarning("MGMT: Got unrecognized command" + command);
-                    Log.i(TAG, "Got unrecognized command" + command);
+                    if (BuildConfig.DEBUG)
+                        Log.i(TAG, "Got unrecognized command" + command);
                     break;
             }
         } else if (command.startsWith("SUCCESS:")) {
@@ -323,7 +318,8 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
             if (fdtoprotect != null)
                 protectFileDescriptor(fdtoprotect);
         } else {
-            Log.i(TAG, "Got unrecognized line from managment" + command);
+            if (BuildConfig.DEBUG)
+                Log.i(TAG, "Got unrecognized line from managment" + command);
             VpnStatus.logWarning("MGMT: Got unrecognized line from management:" + command);
         }
     }
@@ -355,7 +351,8 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
                  */
         // 2 log message
 
-        Log.d("OpenVPN", argument);
+        if (BuildConfig.DEBUG)
+            Log.d("OpenVPN", argument);
 
         VpnStatus.LogLevel level;
         switch (args[1]) {
@@ -607,7 +604,8 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
                 }
                 break;
             default:
-                Log.e(TAG, "Unknown needok command " + argument);
+                if (BuildConfig.DEBUG)
+                    Log.e(TAG, "Unknown needok command " + argument);
                 return;
         }
 
@@ -620,34 +618,38 @@ public class OpenVpnManagementThread implements Runnable, OpenVPNManagement {
         if (pfd == null)
             return false;
 
-        Method setInt;
-        int fdint = pfd.getFd();
+        boolean sent = false;
         try {
-            setInt = FileDescriptor.class.getDeclaredMethod("setInt$", int.class);
-            FileDescriptor fdtosend = new FileDescriptor();
-
-            setInt.invoke(fdtosend, fdint);
-
-            FileDescriptor[] fds = {fdtosend};
+            FileDescriptor fdToSend = pfd.getFileDescriptor();
+            if (!fdToSend.valid()) {
+                VpnStatus.logWarning("Could not send invalid VPN tunnel file descriptor");
+                return false;
+            }
 
             // Trigger a send so we can close the fd on our side of the channel
             // The API documentation fails to mention that it will not reset the file descriptor to
             // be send and will happily send the file descriptor on every write ...
-            mSocket.setFileDescriptorsForSend(fds);
-
-            managmentCommand(cmd);
-
-            // Set the FileDescriptor to null to stop this mad behavior
-            mSocket.setFileDescriptorsForSend(null);
-            pfd.close();
-
-
-        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException |
-                 IOException exp) {
+            mSocket.setFileDescriptorsForSend(new FileDescriptor[]{fdToSend});
+            sent = managmentCommand(cmd);
+        } catch (RuntimeException exp) {
             VpnStatus.logException("Could not send fd over socket", exp);
-            return false;
+        } finally {
+            try {
+                if (mSocket != null)
+                    mSocket.setFileDescriptorsForSend(null);
+            } catch (RuntimeException exp) {
+                VpnStatus.logException("Could not clear fd from management socket", exp);
+                sent = false;
+            }
+
+            try {
+                pfd.close();
+            } catch (IOException exp) {
+                VpnStatus.logException("Could not close VPN tunnel fd", exp);
+                sent = false;
+            }
         }
-        return true;
+        return sent;
     }
 
     private boolean sendTunFD(String needed, String extra) {

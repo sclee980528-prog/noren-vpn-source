@@ -15,7 +15,6 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -60,15 +59,20 @@ import com.android.billingclient.api.QueryProductDetailsParams;
 import com.android.billingclient.api.QueryPurchasesParams;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -80,7 +84,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
+import de.blinkt.openvpn.BuildConfig;
 import de.blinkt.openvpn.LaunchVPN;
 import de.blinkt.openvpn.R;
 import de.blinkt.openvpn.VpnProfile;
@@ -96,19 +104,27 @@ public class MainActivity extends Activity {
     private static final String[] API_URLS = {
             "https://www.vpngate.net/api/iphone/"
     };
-    private static final String TAG = "OneClickVPN";
+    private static final String TAG = "NorenVPN";
     private static final String VPN_STATUS_ACTION = "de.blinkt.openvpn.VPN_STATUS";
     private static final int REQUEST_NOTIFICATIONS = 1001;
     private static final int REQUEST_VPN_PERMISSION = 1002;
     private static final int API_CONNECT_TIMEOUT_MS = 20000;
     private static final int API_READ_TIMEOUT_MS = 45000;
     private static final int API_ATTEMPTS_PER_URL = 3;
+    private static final int MAX_SERVER_DIRECTORY_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_PUBLIC_IP_RESPONSE_BYTES = 64 * 1024;
+    private static final int MAX_SERVER_ROWS = 500;
+    private static final int MAX_CSV_COLUMNS = 32;
+    private static final int MAX_CSV_LINE_CHARS = VpnGateConfigValidator.MAX_BASE64_CHARS + 16 * 1024;
     private static final long API_RETRY_BASE_DELAY_MS = 1500;
     private static final long SERVER_CACHE_STALE_MS = 6L * 60L * 60L * 1000L;
     private static final String SERVER_CACHE_FILE = "server_api_cache.csv";
     private static final long CONNECT_RETRY_LOCK_MS = 35000;
-    private static final int CONNECT_PREFLIGHT_TIMEOUT_MS = 4000;
+    private static final int CONNECT_PREFLIGHT_TIMEOUT_MS = 2500;
+    private static final int CONNECT_PREFLIGHT_BATCH_TIMEOUT_MS = 6000;
     private static final int CONNECT_CANDIDATE_LIMIT = 16;
+    private static final int AUTO_PRIMARY_CANDIDATE_LIMIT = 10;
+    private static final int MAX_DISPLAYED_SERVERS = 20;
     private static final int CONNECT_AUTO_RETRY_LIMIT = 8;
     private static final long CONNECT_RETRY_DELAY_MS = 1500;
     private static final String OPENVPN_FOR_ANDROID = "de.blinkt.openvpn";
@@ -126,22 +142,23 @@ public class MainActivity extends Activity {
     private static final String PREF_CONNECTED_HOST = "oneclickvpn.connected.host";
     private static final String PREF_CONNECTED_COUNTRY_SHORT = "oneclickvpn.connected.country_short";
     private static final String PREF_CONNECTED_COUNTRY_LONG = "oneclickvpn.connected.country_long";
-    private static final int BG = Color.rgb(14, 17, 22);
-    private static final int PANEL = Color.rgb(27, 32, 40);
-    private static final int PANEL_LIGHT = Color.rgb(35, 42, 53);
-    private static final int BLUE = Color.rgb(46, 107, 214);
-    private static final int GREEN = Color.rgb(46, 194, 126);
-    private static final int AMBER = Color.rgb(245, 158, 11);
-    private static final int RED = Color.rgb(224, 85, 85);
-    private static final int TEXT = Color.rgb(232, 234, 237);
-    private static final int MUTED = Color.rgb(154, 160, 166);
-    private static final int BORDER = Color.rgb(42, 48, 58);
-    private static final int PALE_BLUE = Color.rgb(35, 42, 53);
-    private static final int PALE_GREEN = Color.rgb(35, 42, 53);
+    private static final int BG = Color.rgb(17, 19, 21);
+    private static final int PANEL = Color.rgb(27, 30, 32);
+    private static final int PANEL_LIGHT = Color.rgb(38, 49, 46);
+    private static final int BLUE = Color.rgb(15, 139, 141);
+    private static final int GREEN = Color.rgb(36, 168, 102);
+    private static final int AMBER = Color.rgb(244, 185, 66);
+    private static final int RED = Color.rgb(226, 93, 93);
+    private static final int TEXT = Color.rgb(245, 247, 244);
+    private static final int MUTED = Color.rgb(166, 171, 165);
+    private static final int BORDER = Color.rgb(52, 57, 58);
+    private static final int PALE_BLUE = Color.rgb(28, 52, 52);
+    private static final int PALE_GREEN = Color.rgb(28, 54, 42);
     private static final AutoProfile AUTO_VIDEO = new AutoProfile("stream", "Video", "Video",
             180, 25_000_000L, 60, 0, 6L * 60L * 60L * 1000L);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService preflightExecutor = Executors.newFixedThreadPool(8);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<Server> allServers = new ArrayList<>();
     private final List<Server> servers = new ArrayList<>();
@@ -253,7 +270,7 @@ public class MainActivity extends Activity {
             pendingOpenDetailsAfterPurchase = false;
             String message = billingResult == null ? "Unknown billing error" : billingResult.getDebugMessage();
             logLine("Pro purchase failed: " + fallback(message));
-            showErrorDialog("Purchase unavailable", billingUnavailableMessage(message));
+            showErrorDialog(R.string.purchase_unavailable_title, billingUnavailableMessage(message));
         }
     };
 
@@ -297,6 +314,8 @@ public class MainActivity extends Activity {
             unregisterReceiver(vpnStatusReceiver);
             vpnStatusReceiverRegistered = false;
         }
+        executor.shutdownNow();
+        preflightExecutor.shutdownNow();
         super.onDestroy();
     }
 
@@ -373,7 +392,7 @@ public class MainActivity extends Activity {
         });
         guideButton.setOnClickListener(v -> {
             guideFilter = !guideFilter;
-            guideButton.setText(guideFilter ? "Quality filter ON" : "Quality filter OFF");
+            guideButton.setText(guideFilter ? R.string.action_quality_on : R.string.action_quality_off);
             applyCurrentFilters();
         });
 
@@ -589,7 +608,7 @@ public class MainActivity extends Activity {
             } else {
                 logLine("Pro purchase restore failed: " + fallback(billingResult.getDebugMessage()));
                 if (notifyUser) {
-                    showErrorDialog("Restore unavailable", "Google Play could not check your purchase right now. Please try again in a moment.");
+                    showErrorDialog(R.string.restore_unavailable_title, R.string.restore_check_failed);
                 }
             }
         }));
@@ -608,7 +627,7 @@ public class MainActivity extends Activity {
                 } else if (purchase.getPurchaseState() == Purchase.PurchaseState.PENDING) {
                     logLine("Pro purchase is pending.");
                     if (notifyUser) {
-                        showErrorDialog("Purchase pending", "Google Play reports that the Pro purchase is still pending. Server selection will unlock after the purchase completes.");
+                        showErrorDialog(R.string.purchase_pending_title, R.string.purchase_pending_message);
                     }
                 }
             }
@@ -619,12 +638,12 @@ public class MainActivity extends Activity {
                 logLine("Pro server selection unlocked.");
             }
             if (notifyUser && fromRestore) {
-                showErrorDialog("Pro restored", "Server selection is unlocked on this device.");
+                showErrorDialog(R.string.pro_restored_title, R.string.pro_restored_message);
             }
         } else if (fromRestore) {
             setProUnlocked(false);
             if (notifyUser) {
-                showErrorDialog("No purchase found", "No Pro purchase was found for this Google Play account.");
+                showErrorDialog(R.string.no_purchase_title, R.string.no_purchase_message);
             }
         }
     }
@@ -654,18 +673,18 @@ public class MainActivity extends Activity {
         BillingClient client = billingClient;
         if (client == null) {
             initializeBilling();
-            showErrorDialog("Purchase unavailable", billingUnavailableMessage("Google Play Billing is starting. Try again in a moment."));
+            showErrorDialog(R.string.purchase_unavailable_title, billingUnavailableMessage("Google Play Billing is starting."));
             return;
         }
         if (!client.isReady()) {
             startBillingConnection();
-            showErrorDialog("Purchase unavailable", billingUnavailableMessage("Google Play Billing is not ready yet."));
+            showErrorDialog(R.string.purchase_unavailable_title, billingUnavailableMessage("Google Play Billing is not ready yet."));
             return;
         }
         if (proProductDetails == null) {
             queryProProductDetails();
             logLine("Pro product not ready. Create and activate Google Play one-time product: " + PRO_PRODUCT_ID);
-            showErrorDialog("Purchases unavailable", "The Pro product is not active in Google Play yet. Please try again after the store listing is fully set up.");
+            showErrorDialog(R.string.purchases_unavailable_title, R.string.product_inactive_message);
             return;
         }
         BillingFlowParams.ProductDetailsParams.Builder productParams =
@@ -681,7 +700,7 @@ public class MainActivity extends Activity {
         BillingResult result = client.launchBillingFlow(this, params);
         if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
             pendingOpenDetailsAfterPurchase = false;
-            showErrorDialog("Purchase unavailable", billingUnavailableMessage(result.getDebugMessage()));
+            showErrorDialog(R.string.purchase_unavailable_title, billingUnavailableMessage(result.getDebugMessage()));
             logLine("Could not launch Pro purchase: " + fallback(result.getDebugMessage()));
         }
     }
@@ -689,11 +708,11 @@ public class MainActivity extends Activity {
     private void restoreProPurchase() {
         if (billingClient == null) {
             initializeBilling();
-            showErrorDialog("Restore unavailable", "Google Play is connecting. Please try Restore again in a moment.");
+            showErrorDialog(R.string.restore_unavailable_title, R.string.billing_connecting_message);
             return;
         } else if (!billingClient.isReady()) {
             startBillingConnection();
-            showErrorDialog("Restore unavailable", "Google Play is connecting. Please try Restore again in a moment.");
+            showErrorDialog(R.string.restore_unavailable_title, R.string.billing_connecting_message);
             return;
         }
         queryExistingPurchases(true);
@@ -725,36 +744,34 @@ public class MainActivity extends Activity {
     private void updateProUi() {
         if (detailToggleButton != null) {
             if (detailVisible) {
-                detailToggleButton.setText("Close details");
+                detailToggleButton.setText(R.string.action_close_details);
             } else {
-                detailToggleButton.setText(proUnlocked ? "Choose server manually" : "Unlock server selection");
+                detailToggleButton.setText(proUnlocked
+                        ? R.string.action_choose_server
+                        : R.string.action_unlock_server);
             }
         }
     }
 
-    private boolean requireProSelection(String featureName) {
+    private boolean requireProSelection() {
         if (proUnlocked) {
             return true;
         }
-        showProPaywall(featureName);
+        showProPaywall();
         return false;
     }
 
-    private void showProPaywall(String featureName) {
+    private void showProPaywall() {
         pendingOpenDetailsAfterPurchase = true;
         String price = proPriceText.isEmpty()
-                ? "Google Play will show the final local price before purchase."
-                : "One-time purchase: " + proPriceText;
-        String message = featureName + " is included in Pro.\n\n"
-                + "Free: one-tap automatic VPN connection by country.\n\n"
-                + "Pro: pick exact servers, sort by speed/ping/score, use the quality filter, switch servers manually, and export OVPN profiles.\n\n"
-                + price;
+                ? getString(R.string.pro_price_pending)
+                : getString(R.string.pro_price_one_time, proPriceText);
         new AlertDialog.Builder(this)
-                .setTitle("oneclick free vpn Pro")
-                .setMessage(message)
-                .setPositiveButton("Buy Pro", (dialog, which) -> launchProPurchase())
-                .setNegativeButton("Restore purchase", (dialog, which) -> restoreProPurchase())
-                .setNeutralButton("Not now", (dialog, which) -> pendingOpenDetailsAfterPurchase = false)
+                .setTitle(R.string.pro_title)
+                .setMessage(getString(R.string.pro_message, price))
+                .setPositiveButton(R.string.pro_buy, (dialog, which) -> launchProPurchase())
+                .setNegativeButton(R.string.pro_restore, (dialog, which) -> restoreProPurchase())
+                .setNeutralButton(R.string.not_now, (dialog, which) -> pendingOpenDetailsAfterPurchase = false)
                 .show();
     }
 
@@ -784,12 +801,11 @@ public class MainActivity extends Activity {
     }
 
     private String billingUnavailableMessage(String debugMessage) {
-        String message = "Purchases are not available right now.";
+        String message = getString(R.string.billing_unavailable_message);
         String debug = cleanPrefValue(debugMessage);
         if (!debug.isEmpty() && !"-".equals(debug)) {
             logLine("Billing unavailable detail: " + debug);
         }
-        message += "\n\nIf this app was installed from Google Play, please try again in a moment or use Restore purchase.";
         return message;
     }
 
@@ -825,13 +841,13 @@ public class MainActivity extends Activity {
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "Server loading failed", e);
+                debugLog("Server loading failed", e);
                 mainHandler.post(() -> {
                     serverLoading = false;
                     setStatusCard("Load failed", "Could not load the server list.", RED);
                     updateFooterInfo("failed");
                     logLine("Server list load failed: " + exceptionText(e));
-                    detail.setText("Server list load failed\n" + exceptionText(e));
+                    detail.setText(getString(R.string.server_load_failed_detail, exceptionText(e)));
                 });
             }
         });
@@ -842,7 +858,8 @@ public class MainActivity extends Activity {
         for (String url : API_URLS) {
             for (int attempt = 1; attempt <= API_ATTEMPTS_PER_URL; attempt++) {
                 try {
-                    String body = downloadText(url, API_CONNECT_TIMEOUT_MS, API_READ_TIMEOUT_MS);
+                    String body = downloadText(url, API_CONNECT_TIMEOUT_MS, API_READ_TIMEOUT_MS,
+                            MAX_SERVER_DIRECTORY_BYTES, null);
                     ensureLooksLikeServerCsv(body, url);
                     writeServerCache(body);
                     return new DownloadResult(body, url, false, 0);
@@ -851,7 +868,7 @@ public class MainActivity extends Activity {
                         e.addSuppressed(lastError);
                     }
                     lastError = e;
-                    Log.w(TAG, "Server directory failed: " + url + " attempt " + attempt, e);
+                    debugLog("Server directory failed: " + url + " attempt " + attempt, e);
                     postLogLine("API failed " + shortUrl(url) + " (" + attempt + "/" + API_ATTEMPTS_PER_URL + "): " + exceptionText(e));
                     if (!isLastApiAttempt(url, attempt)) {
                         sleepBeforeRetry(attempt);
@@ -891,26 +908,24 @@ public class MainActivity extends Activity {
         try (FileOutputStream output = new FileOutputStream(serverCacheFile())) {
             output.write(body.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            Log.w(TAG, "Failed to write server cache", e);
+            debugLog("Failed to write server cache", e);
             postLogLine("Failed to save server cache: " + exceptionText(e));
         }
     }
 
     private String readServerCache() throws Exception {
-        StringBuilder builder = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                new FileInputStream(serverCacheFile()), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line).append('\n');
-            }
+        File file = serverCacheFile();
+        if (file.length() > MAX_SERVER_DIRECTORY_BYTES) {
+            throw new IllegalStateException("Cached server directory is too large.");
         }
-        return builder.toString();
+        try (InputStream input = new FileInputStream(file)) {
+            return readUtf8Limited(input, MAX_SERVER_DIRECTORY_BYTES, "server cache");
+        }
     }
 
     private boolean hasServerCache() {
         File file = serverCacheFile();
-        return file.exists() && file.length() > 0;
+        return file.exists() && file.length() > 0 && file.length() <= MAX_SERVER_DIRECTORY_BYTES;
     }
 
     private long serverCacheAgeMs() {
@@ -926,35 +941,62 @@ public class MainActivity extends Activity {
         return new File(getFilesDir(), SERVER_CACHE_FILE);
     }
 
-    private String downloadText(String url, int connectTimeoutMs, int readTimeoutMs) throws Exception {
-        return downloadText(url, connectTimeoutMs, readTimeoutMs, null);
-    }
-
-    private String downloadText(String url, int connectTimeoutMs, int readTimeoutMs, Network network) throws Exception {
+    private String downloadText(String url, int connectTimeoutMs, int readTimeoutMs,
+                                int maxBytes, Network network) throws Exception {
         URL target = new URL(url);
+        if (!"https".equalsIgnoreCase(target.getProtocol())) {
+            throw new IllegalArgumentException("Only HTTPS downloads are allowed.");
+        }
         HttpURLConnection connection = (HttpURLConnection) (network == null
                 ? target.openConnection()
                 : network.openConnection(target));
         try {
             connection.setConnectTimeout(connectTimeoutMs);
             connection.setReadTimeout(readTimeoutMs);
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 OneClickVPN/1.0");
+            connection.setInstanceFollowRedirects(false);
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 NorenVPN/1.0");
             connection.setRequestProperty("Accept", "text/csv,text/plain,*/*");
             connection.setRequestProperty("Accept-Encoding", "identity");
             int code = connection.getResponseCode();
             if (code < 200 || code >= 300) {
                 throw new IllegalStateException("HTTP " + code + " from " + url);
             }
-            StringBuilder builder = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    builder.append(line).append('\n');
-                }
+            long contentLength = connection.getContentLength();
+            if (contentLength > maxBytes) {
+                throw new IllegalStateException("Response is too large from " + url);
             }
-            return builder.toString();
+            try (InputStream input = connection.getInputStream()) {
+                return readUtf8Limited(input, maxBytes, url);
+            }
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private String readUtf8Limited(InputStream input, int maxBytes, String source) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(maxBytes, 32 * 1024));
+        byte[] buffer = new byte[8192];
+        int total = 0;
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new IllegalStateException("Response is too large from " + source);
+            }
+            output.write(buffer, 0, read);
+        }
+        return decodeUtf8Strict(output.toByteArray(), source);
+    }
+
+    private String decodeUtf8Strict(byte[] bytes, String source) {
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException e) {
+            throw new IllegalArgumentException("Invalid UTF-8 from " + source, e);
         }
     }
 
@@ -1003,7 +1045,8 @@ public class MainActivity extends Activity {
         Exception lastError = null;
         for (String url : PUBLIC_IP_CHECK_URLS) {
             try {
-                String body = downloadText(url, 10000, 15000, network);
+                String body = downloadText(url, 10000, 15000,
+                        MAX_PUBLIC_IP_RESPONSE_BYTES, network);
                 if (!jsonValue(body, "ip").isEmpty()) {
                     return body;
                 }
@@ -1039,7 +1082,7 @@ public class MainActivity extends Activity {
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to find VPN network for IP check", e);
+            debugLog("Failed to find VPN network for IP check", e);
         }
         return null;
     }
@@ -1054,6 +1097,9 @@ public class MainActivity extends Activity {
         String header = null;
         List<String> data = new ArrayList<>();
         for (String raw : response.split("\\R")) {
+            if (raw.length() > MAX_CSV_LINE_CHARS) {
+                throw new IllegalStateException("Server CSV line is too large.");
+            }
             String line = raw.trim();
             if (!line.isEmpty() && line.charAt(0) == '\ufeff') {
                 line = line.substring(1).trim();
@@ -1073,6 +1119,9 @@ public class MainActivity extends Activity {
             if (line.startsWith("#") || line.startsWith("*")) {
                 continue;
             }
+            if (data.size() >= MAX_SERVER_ROWS) {
+                throw new IllegalStateException("Server CSV has too many rows.");
+            }
             data.add(line);
         }
         if (header == null) {
@@ -1081,7 +1130,9 @@ public class MainActivity extends Activity {
         List<String> columns = parseCsvLine(header);
         Map<String, Integer> index = new HashMap<>();
         for (int i = 0; i < columns.size(); i++) {
-            index.put(columns.get(i), i);
+            if (index.put(columns.get(i), i) != null) {
+                throw new IllegalStateException("Duplicate CSV column: " + columns.get(i));
+            }
         }
         String[] required = {"HostName", "IP", "CountryLong", "CountryShort", "OpenVPN_ConfigData_Base64"};
         for (String key : required) {
@@ -1091,26 +1142,55 @@ public class MainActivity extends Activity {
         }
 
         List<Server> result = new ArrayList<>();
+        int rejected = 0;
         for (String line : data) {
-            List<String> cells = parseCsvLine(line);
-            String config = cell(cells, index, "OpenVPN_ConfigData_Base64");
-            if (config.isEmpty()) {
-                continue;
+            try {
+                List<String> cells = parseCsvLine(line);
+                String config = cell(cells, index, "OpenVPN_ConfigData_Base64");
+                if (config.isEmpty()) {
+                    continue;
+                }
+                Server server = new Server();
+                server.hostName = cell(cells, index, "HostName");
+                server.ip = cell(cells, index, "IP");
+                server.countryLong = cell(cells, index, "CountryLong");
+                server.countryShort = cell(cells, index, "CountryShort");
+                validateServerMetadata(server);
+                server.ping = parseDouble(cell(cells, index, "Ping"), -1);
+                server.speed = parseLong(cell(cells, index, "Speed"), 0);
+                server.sessions = (int) Math.min(Integer.MAX_VALUE,
+                        Math.max(0, parseLong(cell(cells, index, "NumVpnSessions"), 0)));
+                server.uptime = parseLong(cell(cells, index, "Uptime"), 0);
+                server.score = parseLong(cell(cells, index, "Score"), 0);
+                server.configBase64 = config;
+                profileConfig(server);
+                result.add(server);
+            } catch (RuntimeException e) {
+                rejected++;
+                debugLog("Rejected unsafe server directory row", e);
             }
-            Server server = new Server();
-            server.hostName = cell(cells, index, "HostName");
-            server.ip = cell(cells, index, "IP");
-            server.countryLong = cell(cells, index, "CountryLong");
-            server.countryShort = cell(cells, index, "CountryShort");
-            server.ping = parseDouble(cell(cells, index, "Ping"), -1);
-            server.speed = parseLong(cell(cells, index, "Speed"), 0);
-            server.sessions = (int) parseLong(cell(cells, index, "NumVpnSessions"), 0);
-            server.uptime = parseLong(cell(cells, index, "Uptime"), 0);
-            server.score = parseLong(cell(cells, index, "Score"), 0);
-            server.configBase64 = config;
-            result.add(server);
+        }
+        if (result.isEmpty()) {
+            throw new IllegalStateException("Server directory contains no safe VPN profiles.");
+        }
+        if (rejected > 0) {
+            postLogLine("Rejected " + rejected + " invalid server directory rows.");
         }
         return result;
+    }
+
+    private void validateServerMetadata(Server server) {
+        if (server.hostName.isEmpty() || server.hostName.length() > 63
+                || !server.hostName.matches("[A-Za-z0-9][A-Za-z0-9-]*")) {
+            throw new IllegalArgumentException("Invalid VPN Gate host name.");
+        }
+        if (!VpnGateConfigValidator.isIpv4(server.ip)) {
+            throw new IllegalArgumentException("Invalid VPN Gate IPv4 address.");
+        }
+        if (server.countryLong.isEmpty() || server.countryLong.length() > 128
+                || !server.countryShort.matches("[A-Za-z]{2}")) {
+            throw new IllegalArgumentException("Invalid VPN Gate country metadata.");
+        }
     }
 
     private List<String> parseCsvLine(String line) {
@@ -1127,11 +1207,17 @@ public class MainActivity extends Activity {
                     quoted = !quoted;
                 }
             } else if (c == ',' && !quoted) {
+                if (cells.size() >= MAX_CSV_COLUMNS - 1) {
+                    throw new IllegalStateException("Server CSV has too many columns.");
+                }
                 cells.add(current.toString());
                 current.setLength(0);
             } else {
                 current.append(c);
             }
+        }
+        if (quoted) {
+            throw new IllegalStateException("Server CSV has an unterminated quoted field.");
         }
         cells.add(current.toString());
         return cells;
@@ -1158,9 +1244,13 @@ public class MainActivity extends Activity {
             filtered = guide;
         }
         sortServers(filtered);
+        int matchingCount = filtered.size();
+        if (matchingCount > MAX_DISPLAYED_SERVERS) {
+            filtered = new ArrayList<>(filtered.subList(0, MAX_DISPLAYED_SERVERS));
+        }
         updateToolbarColors();
         renderCountryButtons();
-        showServers(filtered, beforeGuide);
+        showServers(filtered, matchingCount, beforeGuide);
     }
 
     private List<Server> filterCountry(List<Server> all) {
@@ -1299,7 +1389,7 @@ public class MainActivity extends Activity {
         return server.ping < 0 ? Double.MAX_VALUE : server.ping;
     }
 
-    private void showServers(List<Server> rows, int beforeGuide) {
+    private void showServers(List<Server> rows, int matchingCount, int beforeGuide) {
         servers.clear();
         servers.addAll(rows);
         List<Server> ranked = autoRankedServers(autoProfile);
@@ -1309,14 +1399,15 @@ public class MainActivity extends Activity {
         for (int i = 0; i < rows.size(); i++) {
             table.addView(rowView(rows.get(i), false, i + 1));
         }
-        setListStatus(rows.size(), beforeGuide);
+        setListStatus(rows.size(), matchingCount, beforeGuide);
         if (rows.isEmpty()) {
             updateRecommendationCard();
-            detail.setText(connectedDetailText() + "Selected server: none\n\nNo " + countryLabel() + " OpenVPN servers are available right now.");
+            detail.setText(getString(R.string.detail_with_current,
+                    connectedDetailText(), getString(R.string.selected_server_none)));
             logLine("No servers for " + countryLabel());
         } else {
             updateDetail();
-            logLine("Server list updated: " + rows.size() + " servers");
+            logLine("Server list updated: showing " + rows.size() + " of " + matchingCount + " servers");
         }
     }
 
@@ -1337,20 +1428,21 @@ public class MainActivity extends Activity {
             row.setOnClickListener(v -> {
                 selectedServer = server;
                 updateDetail();
-                if (!requireProSelection("Server actions")) {
+                if (!requireProSelection()) {
                     return;
                 }
                 showServerActionDialog(server);
             });
         }
-        row.addView(cellText(header ? "Rank" : String.valueOf(rank), 64, header));
-        row.addView(cellText(header ? "HostName" : server.hostName, 220, header));
-        row.addView(cellText(header ? "IP" : server.ip, 150, header));
-        row.addView(cellText(header ? "Ping" : server.pingText(), 80, header));
-        row.addView(cellText(header ? "Speed Mbps" : server.speedText(), 130, header));
-        row.addView(cellText(header ? "Sessions" : String.valueOf(server.sessions), 110, header));
-        row.addView(cellText(header ? "Uptime" : uptimeText(server.uptime), 140, header));
-        row.addView(cellText(header ? "Filter" : (guideReason(server) == null ? "OK" : guideReason(server)), 190, header));
+        row.addView(cellText(header ? getString(R.string.table_rank) : String.valueOf(rank), 64, header));
+        row.addView(cellText(header ? getString(R.string.table_host) : server.hostName, 220, header));
+        row.addView(cellText(header ? getString(R.string.table_ip) : server.ip, 150, header));
+        row.addView(cellText(header ? getString(R.string.table_ping) : server.pingText(), 80, header));
+        row.addView(cellText(header ? getString(R.string.table_speed) : server.speedText(), 130, header));
+        row.addView(cellText(header ? getString(R.string.table_sessions) : String.valueOf(server.sessions), 110, header));
+        row.addView(cellText(header ? getString(R.string.table_uptime) : uptimeText(server.uptime), 140, header));
+        row.addView(cellText(header ? getString(R.string.table_filter)
+                : (guideReason(server) == null ? getString(R.string.filter_ok) : guideReason(server)), 190, header));
         return row;
     }
 
@@ -1367,24 +1459,23 @@ public class MainActivity extends Activity {
         updateRecommendationCard();
         if (selectedServer == null) {
             if (detail != null) {
-                detail.setText("Selected server: none");
+                detail.setText(R.string.selected_server_none);
             }
             return;
         }
         String autoReason = autoRejectReason(selectedServer, autoProfile);
         if (detail != null) {
-            detail.setText(
-                    connectedDetailText()
-                            + "Selected server\n"
-                            + "HostName: " + selectedServer.hostName + "\n"
-                            + "IP: " + selectedServer.ip + "\n"
-                            + "Ping: " + selectedServer.pingText() + " ms\n"
-                            + "Speed: " + selectedServer.speedText() + " Mbps\n"
-                            + "Sessions: " + selectedServer.sessions + "\n"
-                            + "Uptime: " + uptimeText(selectedServer.uptime) + "\n"
-                            + "Filter: " + (guideReason(selectedServer) == null ? "OK" : guideReason(selectedServer)) + "\n"
-                            + "Auto quality: " + (autoReason == null ? "OK" : autoReason)
-            );
+            String filterReason = guideReason(selectedServer);
+            detail.setText(getString(R.string.detail_with_current, connectedDetailText(),
+                    getString(R.string.selected_server_detail,
+                    selectedServer.hostName,
+                    selectedServer.ip,
+                    selectedServer.pingText(),
+                    selectedServer.speedText(),
+                    selectedServer.sessions,
+                    uptimeText(selectedServer.uptime),
+                    filterReason == null ? getString(R.string.filter_ok) : filterReason,
+                    autoReason == null ? getString(R.string.filter_ok) : autoReason)));
         }
     }
 
@@ -1393,9 +1484,9 @@ public class MainActivity extends Activity {
             return;
         }
         if (selectedServer == null) {
-            recommendTitle.setText("No recommended server");
-            recommendMeta.setText("Try another country or refresh the server list.");
-            recommendBadge.setText("Waiting");
+            recommendTitle.setText(R.string.no_recommended_server);
+            recommendMeta.setText(R.string.try_another_country);
+            recommendBadge.setText(R.string.waiting);
             recommendBadge.setTextColor(MUTED);
             recommendBadge.setBackground(roundedBg(PANEL_LIGHT, Color.TRANSPARENT, 28));
             if (recommendCard != null) {
@@ -1406,12 +1497,14 @@ public class MainActivity extends Activity {
 
         String autoReason = autoRejectReason(selectedServer, autoProfile);
         boolean recommended = autoReason == null;
-        recommendTitle.setText(serverCountryDisplayName(selectedServer) + " / " + selectedServer.hostName);
-        recommendMeta.setText("Ping " + selectedServer.pingText() + "ms"
-                + " / " + selectedServer.speedText() + "Mbps"
-                + " / Sessions " + selectedServer.sessions
-                + " / Uptime " + uptimeText(selectedServer.uptime));
-        recommendBadge.setText(recommended ? "Recommended" : autoReason);
+        recommendTitle.setText(getString(R.string.recommend_title,
+                serverCountryDisplayName(selectedServer), selectedServer.hostName));
+        recommendMeta.setText(getString(R.string.recommend_meta,
+                selectedServer.pingText(),
+                selectedServer.speedText(),
+                selectedServer.sessions,
+                uptimeText(selectedServer.uptime)));
+        recommendBadge.setText(recommended ? getString(R.string.recommended) : autoReason);
         recommendBadge.setTextColor(recommended ? GREEN : AMBER);
         recommendBadge.setBackground(roundedBg(recommended ? Color.rgb(220, 252, 231) : Color.rgb(255, 247, 237),
                 Color.TRANSPARENT, 28));
@@ -1421,55 +1514,54 @@ public class MainActivity extends Activity {
     }
 
     private void exportSelectedProfile() {
-        if (!requireProSelection("OVPN profile export")) {
+        if (!requireProSelection()) {
             return;
         }
         if (selectedServer == null) {
             logLine("Select a server first.");
-            showErrorDialog("Server required", "Pick a server from the list, then try again.");
+            showErrorDialog(R.string.server_required_title, R.string.server_required_message);
             return;
         }
         try {
             File file = writeProfileFile();
             boolean savedToDownloads = saveProfileToDownloads(file);
             Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", file);
-            grantUriToProfileHandlers(uri);
             setStatusCard("Profile saved", file.getName(), GREEN);
-            logLine("Saved: " + (savedToDownloads ? "Downloads/OneClickVPN/" : "app temp storage/") + file.getName());
+            logLine("Saved: " + (savedToDownloads ? "Downloads/NorenVPN/" : "app temp storage/") + file.getName());
             showProfileReadyDialog(uri, file.getName(), savedToDownloads);
         } catch (Exception e) {
             setStatusCard("Profile save failed", fallback(e.getMessage()), RED);
             logLine("OVPN save failed: " + e.getMessage());
-            showErrorDialog("Profile save failed", e.getMessage());
+            showErrorDialog(R.string.profile_save_failed_title, e.getMessage());
         }
     }
 
     private void showServerActionDialog(Server server) {
-        if (!requireProSelection("Server actions")) {
+        if (!requireProSelection()) {
             return;
         }
         String autoReason = autoRejectReason(server, autoProfile);
-        String message = "HostName: " + server.hostName + "\n"
-                + "IP: " + server.ip + "\n"
-                + "Ping: " + server.pingText() + " ms\n"
-                + "Speed: " + server.speedText() + " Mbps\n"
-                + "Uptime: " + uptimeText(server.uptime) + "\n"
-                + "Auto quality: " + (autoReason == null ? "OK" : autoReason) + "\n\n"
-                + "Press Connect to request Android VPN permission and start the OpenVPN connection inside this app.";
+        String message = getString(R.string.server_actions_message,
+                server.hostName,
+                server.ip,
+                server.pingText(),
+                server.speedText(),
+                uptimeText(server.uptime),
+                autoReason == null ? getString(R.string.filter_ok) : autoReason);
         new AlertDialog.Builder(this)
-                .setTitle("Server actions")
+                .setTitle(R.string.server_actions_title)
                 .setMessage(message)
-                .setPositiveButton("Connect", (dialog, which) -> {
+                .setPositiveButton(R.string.action_connect, (dialog, which) -> {
                     selectedServer = server;
                     updateDetail();
                     connectSelectedServer();
                 })
-                .setNegativeButton("Save profile", (dialog, which) -> {
+                .setNegativeButton(R.string.action_save_profile, (dialog, which) -> {
                     selectedServer = server;
                     updateDetail();
                     exportSelectedProfile();
                 })
-                .setNeutralButton("Close", null)
+                .setNeutralButton(R.string.action_close, null)
                 .show();
     }
 
@@ -1478,7 +1570,7 @@ public class MainActivity extends Activity {
     }
 
     private void connectSelectedServerFromManual() {
-        if (!requireProSelection("Manual server switching")) {
+        if (!requireProSelection()) {
             return;
         }
         connectSelectedServer();
@@ -1491,7 +1583,7 @@ public class MainActivity extends Activity {
         }
         if (selectedServer == null) {
             logLine("Select a server first.");
-            showErrorDialog("Server required", "Pick a server from the list, then try again.");
+            showErrorDialog(R.string.server_required_title, R.string.server_required_message);
             return;
         }
         if (!ensureVpnDisclosureAccepted(() -> connectSelectedServer(preferredCandidates == null
@@ -1523,7 +1615,7 @@ public class MainActivity extends Activity {
             }
             setStatusCard("Loading servers", "Please wait for the server list.", BLUE);
             logLine("Server list is not ready yet.");
-            showErrorDialog("Loading servers", "The server list is still loading. Please try Start VPN again in a moment.");
+            showErrorDialog(R.string.loading_servers_title, R.string.loading_servers_message);
             return;
         }
         if (selectedCountryShort.isEmpty() && selectedCountryLong.isEmpty()) {
@@ -1536,6 +1628,8 @@ public class MainActivity extends Activity {
             if (!ranked.isEmpty()) {
                 logLine("No server met the quality criteria - using the fastest available server instead.");
             }
+        } else if (ranked.size() > AUTO_PRIMARY_CANDIDATE_LIMIT) {
+            ranked = new ArrayList<>(ranked.subList(0, AUTO_PRIMARY_CANDIDATE_LIMIT));
         }
         int candidateCountBeforeFallback = ranked.size();
         appendFallbackConnectCandidates(ranked);
@@ -1545,11 +1639,10 @@ public class MainActivity extends Activity {
                     + " more server(s).");
         }
         if (ranked.isEmpty()) {
-            String message = "No " + countryLabel() + " servers are available right now.\n\n"
-                    + "Choose another country or refresh the server list, then try again.";
+            String message = getString(R.string.no_server_message, countryLabel());
             setStatusCard("No server available", "No " + countryLabel() + " servers available.", RED);
             logLine("No auto-connect candidates: " + countryLabel());
-            showErrorDialog("No server available", message);
+            showErrorDialog(R.string.no_server_title, message);
             return;
         }
         selectedServer = ranked.get(0);
@@ -1566,18 +1659,16 @@ public class MainActivity extends Activity {
             return true;
         }
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("How your VPN data is handled")
-                .setMessage("To provide the VPN, oneclick free vpn uses Android VpnService and sends this device's network traffic through a public VPN Gate volunteer server until you disconnect.\n\n"
-                        + "VPN Gate states that its connection logs include connection times, your source IP address and hostname, the selected VPN server, protocol and client details, traffic totals and errors, and destination HTTP/HTTPS hostnames, IP addresses, and port numbers. Its central logs are kept for at least three months. Each volunteer server also keeps TCP/IP packet headers for at least two weeks. Logs may be disclosed when legally authorized.\n\n"
-                        + "We do not operate those servers or receive their logs. We use the traffic only to provide the VPN; VPN Gate and the volunteer operator handle the logged data. Choose Agree and continue only if you consent.")
-                .setPositiveButton("Agree and continue", (ignoredDialog, which) -> {
+                .setTitle(R.string.vpn_disclosure_title)
+                .setMessage(R.string.vpn_disclosure_message)
+                .setPositiveButton(R.string.agree_continue, (ignoredDialog, which) -> {
                     appPreferences().edit().putBoolean(PREF_VPN_DISCLOSURE_ACCEPTED, true).apply();
                     if (continueAction != null) {
                         continueAction.run();
                     }
                 })
-                .setNegativeButton("Cancel", null)
-                .setNeutralButton("Logging policy", (ignoredDialog, which) -> openWebPage(VPN_GATE_LOGGING_POLICY_URL))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setNeutralButton(R.string.logging_policy, (ignoredDialog, which) -> openWebPage(VPN_GATE_LOGGING_POLICY_URL))
                 .create();
         dialog.setOnShowListener(shownDialog -> {
             Button continueButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -1630,7 +1721,7 @@ public class MainActivity extends Activity {
                     .apply();
             ProfileManager.setTemporaryProfile(this, profile);
 
-            String startReason = "oneclick free vpn selected server";
+            String startReason = "Noren VPN selected server";
             setStatusCard("Checking permission", "Checking Android VPN permission.", BLUE);
             String endpointText = target.endpoint == null ? "endpoint unknown" : target.endpoint.label();
             logLine("Internal OpenVPN ready: " + profile.mName + " / " + endpointText);
@@ -1695,35 +1786,59 @@ public class MainActivity extends Activity {
 
         Exception lastError = null;
         ConnectTarget deferredUdpTarget = null;
+        List<ConnectTarget> tcpTargets = new ArrayList<>();
         boolean preferResponsiveTcp = !preferredConnectCandidates.isEmpty();
         for (Server server : candidates) {
             try {
                 String config = profileConfig(server);
                 Endpoint endpoint = parseEndpoint(config);
-                if (endpoint != null && endpoint.isTcp()) {
-                    postLogLine("Checking server port: " + server.hostName + " / " + endpoint.label());
-                    if (!canConnect(endpoint)) {
-                        postLogLine("No response, trying next candidate: " + endpoint.label());
-                        continue;
-                    }
+                if (endpoint == null) {
+                    throw new IllegalArgumentException("VPN profile has no usable remote endpoint.");
                 }
                 ConnectTarget target = new ConnectTarget(server, config, endpoint);
-                if (preferResponsiveTcp && (endpoint == null || !endpoint.isTcp())) {
+                if (endpoint.isTcp()) {
+                    tcpTargets.add(target);
+                    continue;
+                }
+                if (preferResponsiveTcp) {
                     if (deferredUdpTarget == null) {
                         deferredUdpTarget = target;
                         postLogLine("UDP target cannot be prechecked, trying TCP candidates first: "
-                                + (endpoint == null ? server.hostName : endpoint.label()));
+                                + endpoint.label());
                     }
                     continue;
-                }
-                if (server != requestedServer) {
-                    postLogLine("Using a responsive fallback instead of the selected server: " + server.hostName);
                 }
                 return target;
             } catch (Exception e) {
                 lastError = e;
                 postLogLine("Candidate check failed: " + server.hostName + " / " + e.getMessage());
             }
+        }
+
+        if (!tcpTargets.isEmpty()) {
+            postLogLine("Checking " + tcpTargets.size() + " candidate server ports in parallel.");
+            List<Callable<Boolean>> checks = new ArrayList<>();
+            for (ConnectTarget target : tcpTargets) {
+                checks.add(() -> canConnect(target.endpoint));
+            }
+            List<Future<Boolean>> results = preflightExecutor.invokeAll(
+                    checks, CONNECT_PREFLIGHT_BATCH_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            for (int i = 0; i < tcpTargets.size(); i++) {
+                Future<Boolean> result = results.get(i);
+                try {
+                    if (!result.isCancelled() && Boolean.TRUE.equals(result.get())) {
+                        ConnectTarget target = tcpTargets.get(i);
+                        if (!sameServer(target.server, requestedServer)) {
+                            postLogLine("Using a responsive fallback instead of the selected server: "
+                                    + target.server.hostName);
+                        }
+                        return target;
+                    }
+                } catch (Exception e) {
+                    lastError = e;
+                }
+            }
+            postLogLine("No TCP candidate responded within the pre-connect timeout.");
         }
         if (deferredUdpTarget != null) {
             postLogLine("No responsive TCP candidate found; trying UDP server: " + deferredUdpTarget.server.hostName);
@@ -1975,7 +2090,7 @@ public class MainActivity extends Activity {
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to inspect VPN network state", e);
+            debugLog("Failed to inspect VPN network state", e);
         }
         return false;
     }
@@ -2091,7 +2206,7 @@ public class MainActivity extends Activity {
         ConfigParser parser = new ConfigParser();
         parser.parseConfig(new StringReader(config));
         VpnProfile profile = parser.convertProfile();
-        profile.mName = "oneclick free vpn " + serverCountryDisplayName(server) + " - " + server.hostName;
+        profile.mName = "Noren VPN " + serverCountryDisplayName(server) + " - " + server.hostName;
         profile.mProfileCreator = getPackageName();
         profile.mTemporaryProfile = true;
         profile.mBlockUnusedAddressFamilies = true;
@@ -2138,11 +2253,11 @@ public class MainActivity extends Activity {
         if (startButton != null) {
             startButton.setEnabled(enabled);
             if (!enabled) {
-                startButton.setText("Connecting…");
+                startButton.setText(R.string.action_connecting);
             } else if (vpnConnected) {
-                startButton.setText("Disconnect");
+                startButton.setText(R.string.action_disconnect);
             } else {
-                startButton.setText("Start VPN");
+                startButton.setText(R.string.action_start_vpn);
             }
             startButton.setBackgroundResource(vpnConnected
                     ? R.drawable.tv_focus_action_connected
@@ -2152,11 +2267,11 @@ public class MainActivity extends Activity {
         if (connectButton != null) {
             connectButton.setEnabled(enabled);
             if (!enabled) {
-                connectButton.setText("Connecting");
+                connectButton.setText(R.string.action_connecting_short);
             } else if (vpnConnected) {
-                connectButton.setText("Switch to selected server");
+                connectButton.setText(R.string.action_switch_server);
             } else {
-                connectButton.setText("Connect selected server");
+                connectButton.setText(R.string.action_connect_selected);
             }
             connectButton.setAlpha(enabled ? 1.0f : 0.55f);
         }
@@ -2192,7 +2307,7 @@ public class MainActivity extends Activity {
             ContentValues values = new ContentValues();
             values.put(MediaStore.Downloads.DISPLAY_NAME, source.getName());
             values.put(MediaStore.Downloads.MIME_TYPE, OVPN_MIME);
-            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/OneClickVPN");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/NorenVPN");
             values.put(MediaStore.Downloads.IS_PENDING, 1);
             target = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
             if (target == null) {
@@ -2212,7 +2327,7 @@ public class MainActivity extends Activity {
             ContentValues complete = new ContentValues();
             complete.put(MediaStore.Downloads.IS_PENDING, 0);
             getContentResolver().update(target, complete, null, null);
-            logLine("Also saved to Downloads/OneClickVPN: " + source.getName());
+            logLine("Also saved to Downloads/NorenVPN: " + source.getName());
             return true;
         } catch (Exception e) {
             logLine("Skipped saving to Downloads: " + e.getMessage());
@@ -2229,23 +2344,20 @@ public class MainActivity extends Activity {
 
     private void showProfileReadyDialog(Uri uri, String fileName, boolean savedToDownloads) {
         String location = savedToDownloads
-                ? "Downloads/OneClickVPN/" + fileName
-                : "app temp storage/" + fileName;
-        String message = "File created\n\n"
-                + "File: " + fileName + "\n"
-                + "Location: " + location + "\n\n"
-                + "Press Open in OpenVPN to go to the import screen. If nothing happens, open Import Profile -> File -> Downloads/OneClickVPN in OpenVPN for Android.";
+                ? "Downloads/NorenVPN/" + fileName
+                : getString(R.string.profile_location_app, fileName);
+        String message = getString(R.string.profile_saved_message, fileName, location);
         new AlertDialog.Builder(this)
-                .setTitle("Profile saved")
+                .setTitle(R.string.profile_saved_title)
                 .setMessage(message)
-                .setPositiveButton("Open in OpenVPN", (dialog, which) -> {
+                .setPositiveButton(R.string.open_in_openvpn, (dialog, which) -> {
                     if (!openProfileWithFallback(uri)) {
-                        logLine("No OpenVPN app found. Import manually from Downloads/OneClickVPN.");
+                        logLine("No OpenVPN app found. Import manually from Downloads/NorenVPN.");
                         showInstallDialog();
                     }
                 })
-                .setNegativeButton("Open OpenVPN app", (dialog, which) -> openOpenVpnApp())
-                .setNeutralButton("Close", null)
+                .setNegativeButton(R.string.open_openvpn_app, (dialog, which) -> openOpenVpnApp())
+                .setNeutralButton(R.string.action_close, null)
                 .show();
     }
 
@@ -2274,23 +2386,41 @@ public class MainActivity extends Activity {
     }
 
     private String profileConfig(Server server) {
-        byte[] decoded = Base64.decode(server.configBase64, Base64.DEFAULT);
-        return hardenConfig(new String(decoded, StandardCharsets.UTF_8));
+        VpnGateConfigValidator.validateBase64(server.configBase64);
+        byte[] decoded;
+        try {
+            decoded = Base64.decode(server.configBase64, Base64.NO_WRAP);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("VPN profile Base64 decoding failed.", e);
+        }
+        if (decoded.length > VpnGateConfigValidator.MAX_DECODED_BYTES) {
+            throw new IllegalArgumentException("VPN profile is too large.");
+        }
+        String config = decodeUtf8Strict(decoded, "VPN profile");
+        return VpnGateConfigValidator.validateAndHarden(config, server.ip);
     }
 
     private void showErrorDialog(String title, String message) {
         new AlertDialog.Builder(this)
                 .setTitle(title)
-                .setMessage(message == null || message.isEmpty() ? "Unknown error." : message)
-                .setPositiveButton("OK", null)
+                .setMessage(message == null || message.isEmpty() ? getString(R.string.unknown_error) : message)
+                .setPositiveButton(android.R.string.ok, null)
                 .show();
+    }
+
+    private void showErrorDialog(int titleRes, int messageRes) {
+        showErrorDialog(getString(titleRes), getString(messageRes));
+    }
+
+    private void showErrorDialog(int titleRes, String message) {
+        showErrorDialog(getString(titleRes), message);
     }
 
     private void openWebPage(String url) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (ActivityNotFoundException | SecurityException e) {
-            showErrorDialog("Unable to open link", url);
+            showErrorDialog(R.string.unable_open_link_title, url);
         }
     }
 
@@ -2333,29 +2463,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void grantUriToProfileHandlers(Uri uri) {
-        Intent view = profileViewIntent(uri, OVPN_MIME);
-        List<ResolveInfo> handlers = getPackageManager().queryIntentActivities(view, 0);
-        for (ResolveInfo info : handlers) {
-            if (info.activityInfo != null && info.activityInfo.packageName != null) {
-                grantUriPermission(info.activityInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
-        }
-        grantUriPermission(OPENVPN_FOR_ANDROID, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        grantUriPermission(OPENVPN_CONNECT, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-    }
-
-    private String hardenConfig(String config) {
-        if (config.contains("block-ipv6")) {
-            return config;
-        }
-        return config.trim()
-                + "\n\n# Added by oneclick free vpn: reduce IPv6 leaks\n"
-                + "block-ipv6\n"
-                + "pull-filter ignore \"ifconfig-ipv6\"\n"
-                + "pull-filter ignore \"route-ipv6\"\n";
-    }
-
     private void openOpenVpnApp() {
         Intent launch = getPackageManager().getLaunchIntentForPackage("de.blinkt.openvpn");
         if (launch != null) {
@@ -2367,13 +2474,13 @@ public class MainActivity extends Activity {
 
     private void showInstallDialog() {
         new AlertDialog.Builder(this)
-                .setTitle("External OpenVPN app")
-                .setMessage("Backup path used only when the built-in connection fails. Normally the app requests Android VPN permission and starts its own OpenVPN service.")
-                .setPositiveButton("Open Play Store", (dialog, which) -> {
+                .setTitle(R.string.external_openvpn_title)
+                .setMessage(R.string.external_openvpn_message)
+                .setPositiveButton(R.string.open_play_store, (dialog, which) -> {
                     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=de.blinkt.openvpn"));
                     startActivity(intent);
                 })
-                .setNegativeButton("Close", null)
+                .setNegativeButton(R.string.action_close, null)
                 .show();
     }
 
@@ -2409,6 +2516,10 @@ public class MainActivity extends Activity {
             pool.addAll(filterCountry(allServers));
         }
         Collections.sort(pool, (left, right) -> {
+            int byScore = compareScoreDesc(left, right);
+            if (byScore != 0) {
+                return byScore;
+            }
             int bySpeed = compareSpeedDesc(left, right);
             if (bySpeed != 0) {
                 return bySpeed;
@@ -2447,22 +2558,25 @@ public class MainActivity extends Activity {
             return guide;
         }
         if (server.ping < 0) {
-            return "No ping";
+            return getString(R.string.reason_no_ping);
         }
         if (server.ping > profile.maxPingMs) {
-            return "Ping " + server.pingText() + "ms too high";
+            return getString(R.string.reason_ping_high, server.pingText());
         }
         if (server.speed < profile.minSpeedBps) {
-            return "Below " + profile.minSpeedMbpsText() + "Mbps";
+            return getString(R.string.reason_speed_low, profile.minSpeedMbpsText());
         }
         if (server.sessions > profile.maxSessions) {
-            return "Over " + profile.maxSessions + " sessions";
+            return getResources().getQuantityString(
+                    R.plurals.reason_sessions_high,
+                    profile.maxSessions,
+                    profile.maxSessions);
         }
         if (profile.minUptimeMs > 0 && server.uptime < profile.minUptimeMs) {
-            return "Uptime under " + uptimeText(profile.minUptimeMs);
+            return getString(R.string.reason_uptime_short, uptimeText(profile.minUptimeMs));
         }
         if (profile.maxUptimeMs > 0 && server.uptime > profile.maxUptimeMs) {
-            return "Uptime over " + uptimeText(profile.maxUptimeMs);
+            return getString(R.string.reason_uptime_long, uptimeText(profile.maxUptimeMs));
         }
         return null;
     }
@@ -2502,28 +2616,16 @@ public class MainActivity extends Activity {
     }
 
     private String guideReason(Server server) {
-        String host = normalizeHost(server.hostName);
-        if (host.contains("public")) {
-            return "Public";
-        }
         if (server.ping < 0) {
-            return "No ping";
+            return getString(R.string.reason_no_ping);
         }
         if (server.speed <= 0) {
-            return "No speed";
+            return getString(R.string.reason_no_speed);
         }
         if (server.sessions >= 100) {
-            return "Crowded";
+            return getString(R.string.reason_crowded);
         }
         return null;
-    }
-
-    private String normalizeHost(String host) {
-        String normalized = host == null ? "" : host.toLowerCase(Locale.ROOT).trim();
-        if (normalized.endsWith(".opengw.net")) {
-            return normalized.substring(0, normalized.length() - ".opengw.net".length());
-        }
-        return normalized;
     }
 
     private String safeFileName(String name) {
@@ -2547,14 +2649,18 @@ public class MainActivity extends Activity {
         return minutes + "m";
     }
 
-    private void setListStatus(int rowCount, int beforeGuide) {
+    private void setListStatus(int displayedCount, int matchingCount, int beforeGuide) {
+        String countText = displayedCount < matchingCount
+                ? displayedCount + " of " + matchingCount
+                : String.valueOf(matchingCount);
         if (vpnConnected) {
             setStatusCard("Connected", "Connected via VPN - " + connectedVpnText()
-                    + " / Selected list: " + countryLabel() + " " + rowCount + " servers", GREEN);
+                    + " / Selected list: " + countryLabel() + " " + countText + " servers", GREEN);
             return;
         }
         if (!connecting) {
-            setStatusCard("Disconnected", countryLabel() + " servers: " + rowCount + " / before filter: " + beforeGuide, GREEN);
+            setStatusCard("Disconnected", countryLabel() + " servers: " + countText
+                    + " / before filter: " + beforeGuide, GREEN);
         }
     }
 
@@ -2588,7 +2694,9 @@ public class MainActivity extends Activity {
     }
 
     private String connectedServerText() {
-        return connectedServerLabel == null || connectedServerLabel.isEmpty() ? "connected" : connectedServerLabel;
+        return connectedServerLabel == null || connectedServerLabel.isEmpty()
+                ? getString(R.string.connected_default)
+                : connectedServerLabel;
     }
 
     private String connectedVpnText() {
@@ -2597,7 +2705,7 @@ public class MainActivity extends Activity {
     }
 
     private String connectedDetailText() {
-        return vpnConnected ? "Current VPN: " + connectedVpnText() + "\n\n" : "";
+        return vpnConnected ? getString(R.string.current_vpn, connectedVpnText()) : "";
     }
 
     private String countryLabel() {
@@ -2606,12 +2714,12 @@ public class MainActivity extends Activity {
                 return countryDisplayName(option);
             }
         }
-        return selectedCountryLong.isEmpty() ? "Selected country" : selectedCountryLong;
+        return selectedCountryLong.isEmpty() ? getString(R.string.selected_country) : selectedCountryLong;
     }
 
     private String countryCardLabel(CountryOption option) {
         return countryFlag(option.shortName) + " "
-                + countryNameEn(option.shortName, option.longName)
+                + countryName(option.shortName, option.longName)
                 + " · " + option.count;
     }
 
@@ -2631,9 +2739,9 @@ public class MainActivity extends Activity {
 
     private String countryDisplayName(CountryOption option) {
         if (option == null) {
-            return "Selected country";
+            return getString(R.string.selected_country);
         }
-        String display = countryNameEn(option.shortName, option.longName);
+        String display = countryName(option.shortName, option.longName);
         if (option.shortName == null || option.shortName.isEmpty()) {
             return display;
         }
@@ -2642,59 +2750,31 @@ public class MainActivity extends Activity {
 
     private String serverCountryDisplayName(Server server) {
         if (server == null) {
-            return "Selected country";
+            return getString(R.string.selected_country);
         }
-        String display = countryNameEn(server.countryShort, server.countryLong);
+        String display = countryName(server.countryShort, server.countryLong);
         if (server.countryShort == null || server.countryShort.isEmpty()) {
             return display;
         }
         return display + " (" + server.countryShort.toUpperCase(Locale.ROOT) + ")";
     }
 
-    private String countryNameEn(String code, String fallbackName) {
+    private String countryName(String code, String fallbackName) {
         String normalizedCode = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
-        switch (normalizedCode) {
-            case "KR":
-                return "South Korea";
-            case "JP":
-                return "Japan";
-            case "US":
-                return "United States";
-            case "VN":
-                return "Vietnam";
-            case "TH":
-                return "Thailand";
-            case "SG":
-                return "Singapore";
-            case "TW":
-                return "Taiwan";
-            case "HK":
-                return "Hong Kong";
-            case "CA":
-                return "Canada";
-            case "RU":
-                return "Russia";
-            case "IN":
-                return "India";
-            case "BR":
-                return "Brazil";
-            case "NL":
-                return "Netherlands";
-            case "IT":
-                return "Italy";
-            case "ES":
-                return "Spain";
-            case "GB":
-                return "United Kingdom";
-            case "DE":
-                return "Germany";
-            case "FR":
-                return "France";
-            case "AU":
-                return "Australia";
-            default:
-                return fallbackName == null || fallbackName.isEmpty() ? normalizedCode : fallbackName;
+        if (normalizedCode.length() == 2) {
+            Locale displayLocale;
+            Configuration configuration = getResources().getConfiguration();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                displayLocale = configuration.getLocales().get(0);
+            } else {
+                displayLocale = configuration.locale;
+            }
+            String localized = new Locale("", normalizedCode).getDisplayCountry(displayLocale);
+            if (localized != null && !localized.isEmpty() && !localized.equalsIgnoreCase(normalizedCode)) {
+                return localized;
+            }
         }
+        return fallbackName == null || fallbackName.isEmpty() ? normalizedCode : fallbackName;
     }
 
     private void updateToolbarColors() {
@@ -2720,15 +2800,17 @@ public class MainActivity extends Activity {
     private String statusBadgeText() {
         if (vpnConnected) {
             if (!tvMode) {
-                return "● Connected";
+                return getString(R.string.status_connected);
             }
             String detail = connectedStatusDetail();
-            return detail.isEmpty() ? "● Connected" : "● Connected · " + detail;
+            return detail.isEmpty()
+                    ? getString(R.string.status_connected)
+                    : getString(R.string.status_connected_detail, detail);
         }
         if (connecting) {
-            return "● Connecting…";
+            return getString(R.string.status_connecting);
         }
-        return "● Disconnected";
+        return getString(R.string.status_disconnected);
     }
 
     private int statusBadgeColor(int fallbackColor) {
@@ -2742,7 +2824,7 @@ public class MainActivity extends Activity {
     }
 
     private String connectedStatusDetail() {
-        String country = countryNameEn(connectedCountryShort, connectedCountryLong);
+        String country = countryName(connectedCountryShort, connectedCountryLong);
         String server = connectedServerLabel == null ? "" : connectedServerLabel.trim();
         if (country == null || country.isEmpty()) {
             return server;
@@ -2757,7 +2839,7 @@ public class MainActivity extends Activity {
         if (footerInfo == null) {
             return;
         }
-        footerInfo.setText("Build " + appVersionText() + " · Servers updated " + refreshText);
+        footerInfo.setText(getString(R.string.footer_status, appVersionText(), refreshText));
     }
 
     private String formatClock(long timeMs) {
@@ -2854,7 +2936,7 @@ public class MainActivity extends Activity {
     }
 
     private void toggleDetailRequested() {
-        if (!detailVisible && !requireProSelection("Manual server selection")) {
+        if (!detailVisible && !requireProSelection()) {
             return;
         }
         setDetailVisible(!detailVisible);
@@ -2869,15 +2951,11 @@ public class MainActivity extends Activity {
     }
 
     private void showInfoDialog() {
-        String message = "oneclick free vpn uses Android VpnService to route this device's network traffic through an encrypted OpenVPN tunnel to a public VPN Gate volunteer server. We do not operate those servers or receive their logs.\n\n"
-                + "VPN Gate states that its central connection logs include connection times, source IP address and hostname, selected server, protocol/client details, traffic totals/errors, and destination HTTP/HTTPS hostnames, IP addresses, and ports. Those logs are kept for at least three months. Volunteer servers keep TCP/IP packet headers for at least two weeks. Legally authorized disclosures may occur.\n\n"
-                + "The app has no account, ads, or analytics. It stores settings, server cache, purchase unlock state, and optional exported OVPN profiles locally. Public IP services receive normal request metadata when the app checks the connected IP. Google Play handles optional Pro purchases.\n\n"
-                + "The tunnel protects traffic only to the VPN endpoint. Security after that endpoint depends on each destination service, and anonymity, availability, and access are not guaranteed.";
         new AlertDialog.Builder(this)
-                .setTitle("Privacy and VPN logging")
-                .setMessage(message)
-                .setPositiveButton("OK", null)
-                .setNeutralButton("Logging policy", (ignoredDialog, which) -> openWebPage(VPN_GATE_LOGGING_POLICY_URL))
+                .setTitle(R.string.privacy_title)
+                .setMessage(R.string.privacy_message)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.logging_policy, (ignoredDialog, which) -> openWebPage(VPN_GATE_LOGGING_POLICY_URL))
                 .show();
     }
 
@@ -2979,11 +3057,11 @@ public class MainActivity extends Activity {
             return;
         }
         view.animate()
-                .scaleX(hasFocus ? 1.07f : 1f)
-                .scaleY(hasFocus ? 1.07f : 1f)
+                .scaleX(hasFocus ? 1.04f : 1f)
+                .scaleY(hasFocus ? 1.04f : 1f)
                 .setDuration(90)
                 .start();
-        view.setElevation(hasFocus ? dp(8) : 0);
+        view.setElevation(hasFocus ? dp(6) : 0);
     }
 
     private TextView text(String value, int sp, int color) {
@@ -2995,7 +3073,9 @@ public class MainActivity extends Activity {
     }
 
     private void logLine(String message) {
-        Log.i(TAG, message);
+        if (BuildConfig.DEBUG) {
+            Log.i(TAG, message);
+        }
         if (log == null) {
             return;
         }
@@ -3008,6 +3088,12 @@ public class MainActivity extends Activity {
 
     private void postLogLine(String message) {
         mainHandler.post(() -> logLine(message));
+    }
+
+    private void debugLog(String message, Throwable error) {
+        if (BuildConfig.DEBUG) {
+            Log.w(TAG, message, error);
+        }
     }
 
     private String appVersionText() {

@@ -2,7 +2,7 @@
 
 Use this in Play Console review/access instructions if a text box is available.
 
-`No account is required. Launch oneclick free vpn on Android TV and press Start VPN to test the free core VPN flow. The app displays a first-connect disclosure explaining that traffic is routed through independent public volunteer VPN servers. After Android's VPN permission prompt is accepted, the app starts an encrypted OpenVPN tunnel and shows connection status.`
+`No account is required. Launch Noren VPN on Android TV and press Start VPN to test the free core VPN flow. The app displays a first-connect disclosure explaining that traffic is routed through independent public volunteer VPN servers. After Android's VPN permission prompt is accepted, the app starts an encrypted OpenVPN tunnel and shows connection status.`
 
 `Manual server selection is an optional Pro feature. The one-time Google Play product ID is pro_server_selection. Pro unlocks server selection, sorting, quality filtering, manual switching, and OVPN profile export. It does not provide premium/private servers.`
 

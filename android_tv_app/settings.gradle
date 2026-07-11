@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OneClickVPN"
+rootProject.name = "NorenVPN"
 include ":app"

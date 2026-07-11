@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Noren VPN</string>
+    <string name="status_disconnected">● 未接続</string>
+    <string name="status_connected">● 接続済み</string>
+    <string name="status_connected_detail">● 接続済み · %1$s</string>
+    <string name="status_connecting">● 接続中…</string>
+    <string name="action_start_vpn">VPNを開始</string>
+    <string name="action_disconnect">切断</string>
+    <string name="action_connecting">接続中…</string>
+    <string name="action_connecting_short">接続中</string>
+    <string name="action_switch_server">選択したサーバーに切替</string>
+    <string name="action_connect_selected">選択したサーバーに接続</string>
+    <string name="action_choose_server">サーバーを手動選択</string>
+    <string name="action_unlock_server">サーバー選択をアンロック</string>
+    <string name="action_close_details">詳細を閉じる</string>
+    <string name="action_privacy">プライバシー</string>
+    <string name="action_speed">速度</string>
+    <string name="action_ping">Ping</string>
+    <string name="action_score">スコア</string>
+    <string name="action_quality_off">品質フィルター OFF</string>
+    <string name="action_quality_on">品質フィルター ON</string>
+    <string name="action_refresh">更新</string>
+    <string name="action_check_ip">IPを確認</string>
+    <string name="section_country">国・地域</string>
+    <string name="selected_server_none">選択中のサーバー: なし</string>
+    <string name="selected_server_detail">選択中のサーバー\nホスト名: %1$s\nIP: %2$s\nPing: %3$s ms\n速度: %4$s Mbps\n接続数: %5$d\n稼働時間: %6$s\nフィルター: %7$s\n自動品質判定: %8$s</string>
+    <string name="detail_with_current">%1$s%2$s</string>
+    <string name="server_load_failed_detail">サーバー一覧の読み込みに失敗しました\n%1$s</string>
+    <string name="selected_country">選択した国・地域</string>
+    <string name="connected_default">接続済み</string>
+    <string name="current_vpn">現在のVPN: %1$s\n\n</string>
+    <string name="footer_status">ビルド %1$s · サーバー更新 %2$s</string>
+
+    <string name="pro_title">Noren VPN Pro</string>
+    <string name="pro_price_pending">購入前にGoogle Playで最終的な現地価格を表示します。</string>
+    <string name="pro_price_one_time">買い切り: %1$s</string>
+    <string name="pro_message">自動モード: 国・地域を選んでワンタップ接続。\n\nProでは、サーバーの直接選択、速度・Ping・スコア順の並べ替え、品質フィルター、手動切替、OVPNプロファイルの書き出しを利用できます。\n\n%1$s</string>
+    <string name="pro_buy">Proを購入</string>
+    <string name="pro_restore">購入を復元</string>
+    <string name="not_now">後で</string>
+    <string name="purchase_unavailable_title">購入を利用できません</string>
+    <string name="purchases_unavailable_title">購入機能を利用できません</string>
+    <string name="restore_unavailable_title">購入を復元できません</string>
+    <string name="billing_unavailable_message">現在、購入機能を利用できません。\n\nGoogle Playからインストールしたアプリの場合は、しばらくしてから再試行するか「購入を復元」を利用してください。</string>
+    <string name="restore_check_failed">現在、Google Playで購入を確認できません。しばらくしてから再試行してください。</string>
+    <string name="purchase_pending_title">購入処理中</string>
+    <string name="purchase_pending_message">Proの購入は保留中です。購入処理が完了するとサーバー選択が有効になります。</string>
+    <string name="pro_restored_title">Proを復元しました</string>
+    <string name="pro_restored_message">この端末でサーバー選択を利用できます。</string>
+    <string name="no_purchase_title">購入が見つかりません</string>
+    <string name="no_purchase_message">このGoogle PlayアカウントにProの購入履歴はありません。</string>
+    <string name="product_inactive_message">Google PlayでPro商品がまだ有効になっていません。ストア設定の完了後に再試行してください。</string>
+    <string name="billing_connecting_message">Google Playに接続中です。しばらくしてから購入の復元を再試行してください。</string>
+
+    <string name="vpn_disclosure_title">VPNデータの取り扱い</string>
+    <string name="vpn_disclosure_message">VPN接続を提供するため、Noren VPNはAndroid VpnServiceを使用し、切断するまでこの端末のネットワーク通信を公開VPN Gateボランティアサーバー経由で送信します。\n\nVPN Gateによると、接続日時、接続元IPアドレスとホスト名、選択したVPNサーバー、プロトコルとクライアント情報、通信量とエラー、接続先のHTTP/HTTPSホスト名・IPアドレス・ポート番号が接続ログに含まれます。中央ログは3か月以上保存され、各ボランティアサーバーでもTCP/IPパケットヘッダーが2週間以上保存されます。法的に認められた場合、ログが開示されることがあります。\n\n当社はこれらのサーバーを運営せず、ログも受け取りません。通信はVPN提供のためだけに使用され、記録データはVPN Gateとボランティア運営者が取り扱います。同意する場合のみ「同意して続行」を選択してください。</string>
+    <string name="agree_continue">同意して続行</string>
+    <string name="logging_policy">ログポリシー</string>
+
+    <string name="privacy_title">プライバシーとVPNログ</string>
+    <string name="privacy_message">Noren VPNはAndroid VpnServiceを使用し、この端末のネットワーク通信を暗号化されたOpenVPNトンネルで公開VPN Gateボランティアサーバーへ送信します。当社はこれらのサーバーを運営せず、ログも受け取りません。\n\nVPN Gateによると、接続日時、接続元IPアドレスとホスト名、選択したサーバー、プロトコルとクライアント情報、通信量とエラー、接続先のHTTP/HTTPSホスト名・IPアドレス・ポートが中央ログに含まれ、3か月以上保存されます。ボランティアサーバーではTCP/IPパケットヘッダーが2週間以上保存されます。法的に認められた開示が行われることがあります。\n\n本アプリにはアカウント、広告、解析機能はありません。設定、サーバーキャッシュ、Pro機能の利用状態、任意で書き出したOVPNプロファイルを端末内に保存します。接続後のIP確認時には、通常のリクエスト情報が公開IP確認サービスへ送信されます。任意のPro購入はGoogle Playが処理します。\n\nトンネルが保護するのはVPN接続先までの通信です。その先の安全性は各接続先サービスに依存し、匿名性、可用性、特定サービスへの接続は保証されません。</string>
+
+    <string name="server_actions_title">サーバー操作</string>
+    <string name="server_actions_message">ホスト名: %1$s\nIP: %2$s\nPing: %3$s ms\n速度: %4$s Mbps\n稼働時間: %5$s\n自動品質判定: %6$s\n\n「接続」を押すとAndroidのVPN許可を確認し、このアプリ内でOpenVPN接続を開始します。</string>
+    <string name="action_connect">接続</string>
+    <string name="action_save_profile">プロファイルを保存</string>
+    <string name="action_close">閉じる</string>
+
+    <string name="profile_saved_title">プロファイルを保存しました</string>
+    <string name="profile_saved_message">ファイルを作成しました\n\nファイル: %1$s\n保存先: %2$s\n\n「OpenVPNで開く」を押してインポート画面へ進みます。反応しない場合は、OpenVPN for Androidで「プロファイルをインポート」→「ファイル」→「Downloads/NorenVPN」を開いてください。</string>
+    <string name="profile_location_app">アプリの一時保存領域/%1$s</string>
+    <string name="open_in_openvpn">OpenVPNで開く</string>
+    <string name="open_openvpn_app">OpenVPNアプリを開く</string>
+    <string name="external_openvpn_title">外部OpenVPNアプリ</string>
+    <string name="external_openvpn_message">内蔵接続に失敗した場合のみ使う予備機能です。通常はAndroidのVPN許可を確認し、アプリ内のOpenVPNサービスを開始します。</string>
+    <string name="open_play_store">Playストアを開く</string>
+
+    <string name="table_rank">順位</string>
+    <string name="table_host">ホスト名</string>
+    <string name="table_ip">IP</string>
+    <string name="table_ping">Ping</string>
+    <string name="table_speed">速度 Mbps</string>
+    <string name="table_sessions">接続数</string>
+    <string name="table_uptime">稼働時間</string>
+    <string name="table_filter">判定</string>
+    <string name="filter_ok">良好</string>
+    <string name="reason_no_ping">Ping情報なし</string>
+    <string name="reason_no_speed">速度情報なし</string>
+    <string name="reason_crowded">混雑</string>
+    <string name="reason_ping_high">Ping %1$smsは高すぎます</string>
+    <string name="reason_speed_low">%1$sMbps未満</string>
+    <plurals name="reason_sessions_high">
+        <item quantity="other">接続数が%1$d件超</item>
+    </plurals>
+    <string name="reason_uptime_short">稼働時間が%1$s未満</string>
+    <string name="reason_uptime_long">稼働時間が%1$s超</string>
+    <string name="recommended">おすすめ</string>
+    <string name="no_recommended_server">おすすめサーバーなし</string>
+    <string name="try_another_country">別の国・地域を選ぶか、サーバー一覧を更新してください。</string>
+    <string name="waiting">待機中</string>
+    <string name="recommend_title">%1$s / %2$s</string>
+    <string name="recommend_meta">Ping %1$sms / %2$sMbps / 接続数 %3$d / 稼働時間 %4$s</string>
+    <string name="server_required_title">サーバーを選択してください</string>
+    <string name="server_required_message">一覧からサーバーを選択して、もう一度お試しください。</string>
+    <string name="profile_save_failed_title">プロファイルを保存できませんでした</string>
+    <string name="loading_servers_title">サーバーを読み込み中</string>
+    <string name="loading_servers_message">サーバー一覧を読み込み中です。しばらくしてから「VPNを開始」をもう一度押してください。</string>
+    <string name="no_server_title">利用可能なサーバーがありません</string>
+    <string name="no_server_message">現在、%1$sのサーバーを利用できません。\n\n別の国・地域を選ぶか一覧を更新して、もう一度お試しください。</string>
+    <string name="unable_open_link_title">リンクを開けません</string>
+    <string name="unknown_error">不明なエラーです。</string>
+</resources>

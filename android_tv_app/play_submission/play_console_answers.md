@@ -4,14 +4,19 @@ Use these as paste-ready answers. Keep the Data safety answers consistent with t
 
 ## Create app
 
-- App name: `oneclick free vpn`
-- Default language: English (United States) is recommended because the current app UI is English.
+- App name: `Noren VPN`
+- Default language: English (United States)
+- Additional language: Japanese (Japan); the app UI, first-connect disclosure, privacy dialog, and store listing are localized.
 - App or game: App
 - Free or paid: Free
 - Category: Tools
 - Contact email: `m980528@gmail.com`
-- Privacy policy URL: `https://files.catbox.moe/p9w8ck.html`
-- VpnService review video URL: `https://files.catbox.moe/g9h9rd.mp4`
+- Privacy policy URL: `REPLACE_WITH_PUBLIC_NOREN_POLICY_URL`
+- VpnService review video URL: `REPLACE_WITH_V34_REVIEW_VIDEO_URL`
+
+Do not submit either placeholder or reuse the old v33 URLs. The hosted policy must
+match `privacy_policy.html`, and the review video must show the versionCode 34
+first-connect disclosure.
 
 ## App access / sign-in details
 
@@ -35,7 +40,9 @@ Create one product:
 - Product ID: `pro_server_selection`
 - Product name: `Pro Server Selection`
 - Description: `Unlock manual server selection, server sorting, quality filtering, manual switching, and OVPN profile export.`
-- Suggested launch price: KRW 2,900 to 3,900, or USD 2.99 to 4.99 equivalent.
+- Japanese product name: `Pro サーバー選択`
+- Japanese description: `サーバーの手動選択、並べ替え、品質フィルター、手動切替、OVPNプロファイル書き出しを解除します。`
+- Suggested launch price: JPY 480, or USD 2.99 equivalent.
 
 Do not describe this as premium/private servers. It unlocks control features only.
 
@@ -107,7 +114,7 @@ Select: Yes, providing a VPN is the core functionality of the app.
 
 Pasteable explanation:
 
-`oneclick free vpn uses Android VpnService as its core feature to create a user-initiated VPN tunnel on Android TV, Google TV, phones, and tablets. When the user presses Start VPN and accepts the Android VPN permission prompt, the app starts an encrypted OpenVPN tunnel to a selected public volunteer VPN server. The app does not use VpnService to redirect advertising traffic, manipulate traffic for monetization, or perform ad fraud. The app has no advertising SDK. The app shows an in-app disclosure before the first connection and includes a Privacy button in the main interface.`
+`Noren VPN uses Android VpnService as its core feature to create a user-initiated VPN tunnel on Android TV, Google TV, phones, and tablets. When the user presses Start VPN and accepts the Android VPN permission prompt, the app starts an encrypted OpenVPN tunnel to a selected public volunteer VPN server. The app does not use VpnService to redirect advertising traffic, manipulate traffic for monetization, or perform ad fraud. The app has no advertising SDK. The app shows an in-app disclosure before the first connection and includes a Privacy button in the main interface.`
 
 If asked for foreground service / special use reason:
 
@@ -117,7 +124,7 @@ If asked for foreground service / special use reason:
 
 First-connect disclosure in versionCode 34:
 
-`To provide the VPN, oneclick free vpn uses Android VpnService and sends this device's network traffic through a public VPN Gate volunteer server until you disconnect. VPN Gate states that its connection logs include connection times, your source IP address and hostname, the selected VPN server, protocol and client details, traffic totals and errors, and destination HTTP/HTTPS hostnames, IP addresses, and port numbers. Its central logs are kept for at least three months. Each volunteer server also keeps TCP/IP packet headers for at least two weeks. Logs may be disclosed when legally authorized. We do not operate those servers or receive their logs. We use the traffic only to provide the VPN; VPN Gate and the volunteer operator handle the logged data. Choose Agree and continue only if you consent.`
+`To provide the VPN, Noren VPN uses Android VpnService and sends this device's network traffic through a public VPN Gate volunteer server until you disconnect. VPN Gate states that its connection logs include connection times, your source IP address and hostname, the selected VPN server, protocol and client details, traffic totals and errors, and destination HTTP/HTTPS hostnames, IP addresses, and port numbers. Its central logs are kept for at least three months. Each volunteer server also keeps TCP/IP packet headers for at least two weeks. Logs may be disclosed when legally authorized. We do not operate those servers or receive their logs. We use the traffic only to provide the VPN; VPN Gate and the volunteer operator handle the logged data. Choose Agree and continue only if you consent.`
 
 Current Privacy button summary:
 
@@ -125,13 +132,9 @@ The Privacy dialog repeats the VPN Gate data types and retention periods, explai
 
 ## Review video script
 
-Recorded TV demo:
+Record a new versionCode 34 TV demo and show:
 
-`https://files.catbox.moe/g9h9rd.mp4`
-
-If re-recording later, show:
-
-1. Launch oneclick free vpn.
+1. Launch Noren VPN.
 2. Open Privacy and show the VPN/data disclosure.
 3. Press Start VPN.
 4. Show the first-connect disclosure.

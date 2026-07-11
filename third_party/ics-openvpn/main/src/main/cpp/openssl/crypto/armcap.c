@@ -347,11 +347,13 @@ void OPENSSL_cpuid_setup(void)
 #endif
     }
 #ifdef __aarch64__
+# if !defined(OPENSSL_ANDROID_DISABLE_SVE)
     if (getauxval(OSSL_HWCAP) & OSSL_HWCAP_SVE)
         OPENSSL_armcap_P |= ARMV8_SVE;
 
     if (getauxval(OSSL_HWCAP2) & OSSL_HWCAP2_SVE2)
         OPENSSL_armcap_P |= ARMV9_SVE2;
+# endif
 
     if (getauxval(OSSL_HWCAP2) & OSSL_HWCAP2_RNG)
         OPENSSL_armcap_P |= ARMV8_RNG;

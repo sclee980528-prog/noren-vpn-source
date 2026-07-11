@@ -1098,6 +1098,7 @@ elseif (${ANDROID_ABI} STREQUAL "arm64-v8a")
             -DVPAES_ASM
             -DVPSM4_ASM
             -DOPENSSL_SM3_ASM
+            -DOPENSSL_ANDROID_DISABLE_SVE
             -DSM4_ASM
             -DECP_SM2P256_ASM
             )

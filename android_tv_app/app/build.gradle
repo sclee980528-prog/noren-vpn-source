@@ -102,9 +102,20 @@ android {
         }
     }
 
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     compileOptions {
         targetCompatibility JavaVersion.VERSION_17
         sourceCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        // The embedded skeleton includes hundreds of unused, partially translated UI resources.
+        disable "MissingTranslation"
     }
 }
 
@@ -115,6 +126,7 @@ dependencies {
     implementation "androidx.annotation:annotation:1.8.2"
     implementation "androidx.core:core:1.13.1"
     implementation "com.android.billingclient:billing:$billing_version"
+    testImplementation "junit:junit:4.13.2"
 
     constraints {
         implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_stdlib_version"

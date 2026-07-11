@@ -1,6 +1,6 @@
 # Source license notice
 
-The application combines original oneclick free vpn code with ics-openvpn and
+The application combines original Noren VPN code with ics-openvpn and
 OpenVPN code. Because the combined program incorporates the
 `de.blinkt.openvpn` class hierarchy, the distributed combined work is licensed
 under the GNU General Public License, version 2 or, at your option, any later
