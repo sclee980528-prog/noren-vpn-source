@@ -50,6 +50,12 @@ months and that volunteer servers retain TCP/IP packet headers for at least two
 weeks. Read its current logging policy before using or redistributing the app:
 https://www.vpngate.net/en/about_abuse.aspx
 
+Noren VPN's English and Japanese privacy policy is published at:
+https://sclee980528-prog.github.io/noren-vpn-source/
+
+Versioned source archives and the Google Play VpnService review video are
+published with the `v1.0.0-v34` GitHub release.
+
 ## License
 
 The combined app is distributed under GNU GPL version 2 or later, subject to

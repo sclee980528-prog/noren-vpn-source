@@ -32,6 +32,7 @@ Important notes:
 - Server availability, quality, speed, and location can change at any time.
 - The app does not guarantee anonymity, security, streaming access, or access to any specific website or service.
 - Pro sells app control features only; it does not provide private or premium VPN servers.
+- Corresponding source code and open-source notices: https://github.com/sclee980528-prog/noren-vpn-source
 
 ## Category
 
@@ -86,3 +87,4 @@ Noren VPNは、VPN Gate学術実験プロジェクトが公開する独立ボラ
 - サーバーの稼働状況、品質、速度、所在地は随時変わります。
 - 匿名性、安全性、動画配信サービス、特定サイトやサービスへの接続は保証しません。
 - Proが提供するのはアプリの操作機能だけです。専用またはプレミアムVPNサーバーは提供しません。
+- 対応するソースコードとオープンソースライセンス表示: https://github.com/sclee980528-prog/noren-vpn-source

@@ -24,12 +24,14 @@ Expected release version:
 
 ## Required before final review
 
-- Host the updated `privacy_policy.html` at a stable public, non-PDF, non-geofenced, non-editable URL. Do not reuse the older v33 policy without replacing it.
-- Publish the complete GPL corresponding source and build scripts, excluding signing keys and local secrets, and add the public source URL to the app/listing.
-- Re-record the VpnService review video. The older v33 video does not show the expanded VPN Gate logging disclosure required by versionCode 34.
 - Confirm the exact developer name and support contact shown on the Play listing match the privacy policy.
 
-Google requires the privacy policy to be publicly accessible, non-geofenced, non-editable, and not a PDF.
+## Public submission dependencies
+
+- Privacy policy: `https://sclee980528-prog.github.io/noren-vpn-source/`
+- Corresponding source: `https://github.com/sclee980528-prog/noren-vpn-source`
+- VpnService review video: `https://github.com/sclee980528-prog/noren-vpn-source/releases/download/v1.0.0-v34/noren-vpn-v34-vpnservice-review.mp4`
+- Review video: 77.6 seconds, 1920x1080, showing app launch, full disclosure, non-consent and retrigger flow, consent, Android VPN permission, and a live connected VPN.
 
 ## File map
 
@@ -37,20 +39,22 @@ Google requires the privacy policy to be publicly accessible, non-geofenced, non
 - `privacy_policy.html`: HTML privacy policy ready to host.
 - `play_console_answers.md`: App content, Data safety, VpnService, ads, target audience, and in-app product answers.
 - `reviewer_notes.md`: short review notes to paste into Play Console sign-in/access instructions.
-- `store_assets/en-US/`: English 1024x500 feature graphic and 1280x720 TV banner.
-- `store_assets/ja-JP/`: Japanese 1024x500 feature graphic and 1280x720 TV banner.
+- `review/noren-vpn-v34-vpnservice-review.mp4`: verified VpnService review video.
+- `store_assets/en-US/`: English 1024x500 feature graphic, 1280x720 TV banner, and unaltered 1920x1080 TV screenshot.
+- `store_assets/ja-JP/`: Japanese 1024x500 feature graphic, 1280x720 TV banner, and unaltered 1920x1080 TV screenshot.
 
 ## Verified release state
 
-- AAB SHA-256: `72a1cfdf1e8ac2ae7cee951efd16636e62c195fcde4965d1af12183dbafea3fc`
-- APK SHA-256: `294bea32490c0c54aaa6ef4b4e3c78577a04811c19191b752fcc293b92c323db`
+- AAB SHA-256: `b71132dd22cc631f511cdf56cdd0a0d551fb39fb7e9e3597c3bbf6a55cb3a051`
+- APK SHA-256: `9bfe4f52875d1cf585d0b1ace75d76dc3b8260ce22ddec54a16e974dfa99c4bd`
 - Native symbols SHA-256: `2e2acc9707c46de0dfaf0b255902c56247d300fd866279c34b07bfc85a8803c9`
+- VpnService review video SHA-256: `a432e57888bcba28133dbbb2e203e5bedc4e11c5a2a80133ca4bde814ba6bbe8`
 - APK signature: verified with APK Signature Scheme v1 and v2.
 - Packaged native engine: OpenSSL `4.0.1` for `arm64-v8a` and `armeabi-v7a`.
 - Native packaging: APK zip alignment and every ARM64 ELF `LOAD` segment verified
   at `0x4000` (16 KB).
 - Unit tests: 6 tests, 0 failures.
-- Release Lint: 0 errors, 544 warnings; remaining warnings are primarily inherited from the vendored ics-openvpn skeleton.
+- Release Lint: 0 errors, 540 warnings; remaining warnings are primarily inherited from the vendored ics-openvpn skeleton.
 - Languages: English and Japanese app-owned string and plural resources have matching key sets.
 - Android TV 16 runtime: three clean cold starts without a native crash, followed
   by a validated Japan VPN connection, disconnect, reconnect, and sleep/wake pass.

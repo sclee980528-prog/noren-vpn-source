@@ -149,11 +149,38 @@ func drawAppBanner() throws {
 
     image.unlockFocus()
     let outputs = [
-        "app/src/main/res/drawable-xhdpi/app_banner.png",
-        "app/src/tv/res/drawable/app_banner_tv.png",
-        "app/src/tv/res/drawable-xhdpi/app_banner_tv.png"
+        "app/src/main/res/mipmap-xhdpi/app_banner.png",
+        "app/src/tv/res/mipmap-xhdpi/app_banner_tv.png"
     ]
     for output in outputs {
+        try savePNG(image, to: output)
+    }
+}
+
+func drawAppIcons() throws {
+    let outputs: [(String, Int)] = [
+        ("app/src/main/res/mipmap-mdpi/app_icon.png", 80),
+        ("app/src/main/res/mipmap-hdpi/app_icon.png", 120),
+        ("app/src/main/res/mipmap-xhdpi/app_icon.png", 160),
+        ("app/src/main/res/mipmap-xxhdpi/app_icon.png", 240),
+        ("app/src/main/res/mipmap-xxxhdpi/app_icon.png", 320)
+    ]
+
+    for (output, pixels) in outputs {
+        let size = CGFloat(pixels)
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+
+        color(0x0B1320).setFill()
+        CGRect(x: 0, y: 0, width: size, height: size).fill()
+        let radius = size / 3
+        drawPowerMark(
+            center: CGPoint(x: size / 2, y: size / 2),
+            radius: radius,
+            lineWidth: radius * 0.21
+        )
+
+        image.unlockFocus()
         try savePNG(image, to: output)
     }
 }
@@ -163,3 +190,4 @@ try drawFeatureGraphic(locale: "ja-JP", headline: "ワンタップ。迷わな�
 try drawTvBanner(locale: "en-US", headline: "One-tap public VPN connection")
 try drawTvBanner(locale: "ja-JP", headline: "公開VPNへワンタップ接続")
 try drawAppBanner()
+try drawAppIcons()

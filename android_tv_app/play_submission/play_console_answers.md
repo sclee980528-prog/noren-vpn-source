@@ -11,12 +11,12 @@ Use these as paste-ready answers. Keep the Data safety answers consistent with t
 - Free or paid: Free
 - Category: Tools
 - Contact email: `m980528@gmail.com`
-- Privacy policy URL: `REPLACE_WITH_PUBLIC_NOREN_POLICY_URL`
-- VpnService review video URL: `REPLACE_WITH_V34_REVIEW_VIDEO_URL`
+- Privacy policy URL: `https://sclee980528-prog.github.io/noren-vpn-source/`
+- Corresponding source URL: `https://github.com/sclee980528-prog/noren-vpn-source`
+- VpnService review video URL: `https://github.com/sclee980528-prog/noren-vpn-source/releases/download/v1.0.0-v34/noren-vpn-v34-vpnservice-review.mp4`
 
-Do not submit either placeholder or reuse the old v33 URLs. The hosted policy must
-match `privacy_policy.html`, and the review video must show the versionCode 34
-first-connect disclosure.
+The hosted policy matches `privacy_policy.html`. The 77.6-second review video
+shows the versionCode 34 first-connect disclosure and live VPN connection.
 
 ## App access / sign-in details
 
@@ -132,14 +132,14 @@ The Privacy dialog repeats the VPN Gate data types and retention periods, explai
 
 ## Review video script
 
-Record a new versionCode 34 TV demo and show:
+The final 77.6-second versionCode 34 TV review video shows:
 
-1. Launch Noren VPN.
-2. Open Privacy and show the VPN/data disclosure.
-3. Press Start VPN.
-4. Show the first-connect disclosure.
-5. Accept Android VPN permission.
-6. Show Connected status and public IP check result.
-7. Press Unlock server selection and show the Pro paywall / Google Play Billing flow.
+1. Open Noren VPN from the Android TV launcher.
+2. Press Start VPN and show the complete first-connect disclosure.
+3. Choose Cancel and return to the disconnected home screen.
+4. Press Start VPN again and show that the complete disclosure is presented again.
+5. Choose Agree and continue.
+6. Move focus from the Android VPN warning to OK and grant VpnService permission.
+7. Show the live Connected status for a public Japan VPN server.
 
-Keep the video under two minutes if possible.
+The submitted video must be 90 seconds or shorter.
