@@ -1,0 +1,13 @@
+.gradle/
+**/.cxx/
+**/build/
+.DS_Store
+local.properties
+release-keystore.properties
+release/
+*.jks
+*.keystore
+*.hprof
+*.bak
+*.bak.*
+play_submission/*.mp4

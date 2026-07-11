@@ -1,0 +1,15 @@
+.DS_Store
+.gradle/
+**/.cxx/
+**/build/
+local.properties
+release-keystore.properties
+release/
+*.jks
+*.keystore
+*.hprof
+*.bak
+*.bak.*
+*.bak-*
+*.mp4
+

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tv_bg">#0E1116</color>
+    <color name="tv_card">#1B2028</color>
+    <color name="tv_card_focused">#232A35</color>
+    <color name="tv_action">#2E6BD6</color>
+    <color name="tv_connected">#2EC27E</color>
+    <color name="tv_error">#E05555</color>
+    <color name="tv_text">#E8EAED</color>
+    <color name="tv_muted">#9AA0A6</color>
+    <color name="tv_focus_stroke">#FFFFFF</color>
+    <color name="tv_border">#2A303A</color>
+</resources>

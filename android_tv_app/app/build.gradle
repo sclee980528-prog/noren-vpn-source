@@ -1,0 +1,124 @@
+plugins {
+    id "com.android.application"
+}
+
+def releaseKeystorePropertiesFile = rootProject.file("release-keystore.properties")
+def releaseKeystoreProperties = new Properties()
+if (releaseKeystorePropertiesFile.exists()) {
+    releaseKeystorePropertiesFile.withInputStream { releaseKeystoreProperties.load(it) }
+}
+
+android {
+    namespace "de.blinkt.openvpn"
+    compileSdk 36
+
+    buildFeatures {
+        aidl true
+        buildConfig true
+    }
+
+    ndkVersion "30.0.14904198"
+
+    defaultConfig {
+        applicationId "com.oneclickvpn"
+        minSdk 23
+        targetSdk 35
+        versionCode 34
+        versionName "1.0.0"
+
+        buildConfigField "boolean", "openvpn3", "false"
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+        externalNativeBuild {
+            cmake {
+                arguments "-DICS_OPENVPN_SKELETON=ON"
+            }
+        }
+    }
+
+    flavorDimensions "implementation"
+    productFlavors {
+        skeleton {
+            dimension "implementation"
+        }
+        tv {
+            dimension "implementation"
+            applicationIdSuffix ".tv"
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (releaseKeystorePropertiesFile.exists()) {
+                storeFile rootProject.file(releaseKeystoreProperties["storeFile"])
+                storePassword releaseKeystoreProperties["storePassword"]
+                keyAlias releaseKeystoreProperties["keyAlias"]
+                keyPassword releaseKeystoreProperties["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (releaseKeystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += [
+                    "../../third_party/ics-openvpn/main/src/main/java",
+                    "../../third_party/ics-openvpn/main/src/skeleton/java"
+            ]
+            aidl.srcDirs += ["../../third_party/ics-openvpn/main/src/main/aidl"]
+            res.srcDirs += [
+                    "../../third_party/ics-openvpn/main/src/main/res",
+                    "../../third_party/ics-openvpn/main/src/skeleton/res"
+            ]
+            assets.srcDirs += [
+                    "../../third_party/ics-openvpn/main/src/main/assets",
+                    "../../third_party/ics-openvpn/main/build/ovpnassets"
+            ]
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file("../../third_party/ics-openvpn/main/src/main/cpp/CMakeLists.txt")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    compileOptions {
+        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    def billing_version = "9.1.0"
+    def kotlin_stdlib_version = "1.8.22"
+
+    implementation "androidx.annotation:annotation:1.8.2"
+    implementation "androidx.core:core:1.13.1"
+    implementation "com.android.billingclient:billing:$billing_version"
+
+    constraints {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_stdlib_version"
+        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_stdlib_version"
+        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_stdlib_version"
+    }
+}
